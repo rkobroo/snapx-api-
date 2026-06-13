@@ -452,7 +452,7 @@ export async function onRequest(context) {
           }
         } catch (e2) {}
       }
-      if (freshTitle) result.title = freshTitle;
+      if (freshTitle && freshTitle !== 'TikTok - Make Your Day' && freshTitle !== 'TikTok') result.title = freshTitle;
       return jsonResponse(result);
     }
 
