@@ -224,13 +224,9 @@ async function abInstagram(url) {
   const data = await abBackendFetch('igdl', url);
   if (!data?.[0]?.url) throw new Error('No Instagram URL from backend');
   const allUrls = [...new Set(data.map(i => i.url).filter(Boolean))];
-  return {
-    result: data[0].url,
-    title: '',
-    preview: data[0]?.thumbnail || '',
-    media: allUrls,
-    type: 'image'
-  };
+  const isVideo = data[0].url.match(/\.(mp4|webm|mkv|avi|mov)(\?|$)/i) || data[0]?.type === 'video' || url.includes('/reel/');
+  if (isVideo) return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '' };
+  return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: allUrls, type: 'image' };
 }
 
 async function ytScrapeFallback(url) {
