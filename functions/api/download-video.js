@@ -241,6 +241,8 @@ async function instagramScrape(url) {
   if (vidUrl) return { result: vidUrl, title };
   const allImgs = [...new Set([...html.matchAll(/"display_url":"([^"]+)"/g)].map(m => m[1]))];
   if (allImgs.length) return { result: allImgs[0], title, media: allImgs, type: 'image' };
+  const ldMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
+  if (ldMatch) try { const ld = JSON.parse(ldMatch[1]); const u = ld.thumbnailUrl || ld.image; if (u) return { result: Array.isArray(u) ? u[0] : u, title, media: Array.isArray(u) ? u : [u], type: 'image' }; } catch (e) {}
   const imgUrl = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1]
     || html.match(/<img[^>]*class="[^"]*photo[^"]*"[^>]*src="([^"]+)"/)?.[1];
   if (imgUrl) return { result: imgUrl, title, type: 'image' };
@@ -283,13 +285,14 @@ export async function onRequest(context) {
   if (mode === 'download') {
     const dlUrl = params.get('url');
     const dlName = params.get('name') || 'video';
+    const dlType = params.get('type') || '';
     if (!dlUrl) return jsonResponse({ error: 'Missing url' }, 400);
     const resp = await fetch(decodeURIComponent(dlUrl), {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     const headers = new Headers(resp.headers);
     const safeName = dlName.replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
-    const ext = dlUrl.match(/\.(mp4|webm|mkv|avi|mov|jpg|jpeg|png|webp|gif)(\?|$)/)?.[1] || 'mp4';
+    const ext = dlType === 'image' ? 'jpg' : (dlUrl.match(/\.(mp4|webm|mkv|avi|mov|jpg|jpeg|png|webp|gif)(\?|$)/)?.[1] || 'mp4');
     headers.set('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
     headers.set('Access-Control-Allow-Origin', '*');
     return new Response(resp.body, { status: resp.status, headers });
