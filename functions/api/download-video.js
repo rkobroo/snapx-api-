@@ -132,11 +132,13 @@ async function abYoutube(url) {
 async function abInstagram(url) {
   const data = await abBackendFetch('igdl', url);
   if (!data?.[0]?.url) throw new Error('No Instagram URL from backend');
+  const allUrls = data.map(i => i.url).filter(Boolean);
   return {
     result: data[0].url,
     title: '',
     preview: data[0]?.thumbnail || '',
-    full_data: data
+    media: allUrls,
+    type: 'image'
   };
 }
 
@@ -362,15 +364,19 @@ export async function onRequest(context) {
     if (url.includes('instagram.com')) {
       let result;
       try {
-        result = await snapsaveFetch(url);
-        const scrape = await instagramScrape(url);
-        if (scrape.title) result.title = scrape.title;
-        if (scrape.type) result.type = scrape.type;
-        if (scrape.media) result.media = scrape.media;
+        result = await abInstagram(url);
+        if (!result.media || result.media.length === 0) {
+          const scrape = await instagramScrape(url);
+          if (scrape.media) result.media = scrape.media;
+        }
+        if (!result.title) {
+          const scrape = await instagramScrape(url);
+          if (scrape.title) result.title = scrape.title;
+        }
         return jsonResponse(result);
       } catch (e) {}
       try {
-        result = await abInstagram(url);
+        result = await snapsaveFetch(url);
         const scrape = await instagramScrape(url);
         if (scrape.title) result.title = scrape.title;
         if (scrape.type) result.type = scrape.type;
