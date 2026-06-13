@@ -14,6 +14,64 @@ function decodeHtmlEntities(str) {
     .replace(/&apos;/g, "'");
 }
 
+const FVIDGO_PUB_KEY = 'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDCAdf/EyIbLBxjGqmh7qLU6/CPCzru+75+82OSPZ+nf4BFvg88drpZ6KigNW0J8TNgxe6Yms1irCZNVDyu+RXsl4y/7c2KOHc4OGTzHB5fUMiMasFUvcEs2P70e6yA/sKHZfBLG1XPhlb84Ibs3nhD3W5e2SuC+4EuVkaqzN08LQIDAQAB';
+
+function bytesToBigInt(bytes) {
+  let r = 0n;
+  for (const b of bytes) r = (r << 8n) + BigInt(b);
+  return r;
+}
+
+function bigIntToBytes(n, len) {
+  const b = new Uint8Array(len);
+  for (let i = len - 1; i >= 0; i--) { b[i] = Number(n & 0xffn); n >>= 8n; }
+  return b;
+}
+
+function modPow(base, exp, mod) {
+  let r = 1n;
+  base %= mod;
+  while (exp > 0n) { if (exp & 1n) r = (r * base) % mod; exp >>= 1n; base = (base * base) % mod; }
+  return r;
+}
+
+function parseRSAPublicKey(b64) {
+  const der = atob(b64);
+  let off = 0;
+  function readTag() { return der.charCodeAt(off++); }
+  function readLen() {
+    let l = der.charCodeAt(off++);
+    if (l & 0x80) { const n = l & 0x7f; l = 0; for (let i = 0; i < n; i++) l = (l << 8) | der.charCodeAt(off++); }
+    return l;
+  }
+  readTag(); readLen(); readTag(); readLen();
+  readTag(); const oidLen = readLen(); off += oidLen;
+  readTag(); readLen();
+  readTag(); readLen(); off++;
+  readTag(); readLen();
+  readTag(); const nLen = readLen();
+  const nBytes = new Uint8Array(der.slice(off, off + nLen).split('').map(c => c.charCodeAt(0)));
+  const hasLeadingZero = nBytes[0] === 0;
+  const keyLen = hasLeadingZero ? nLen - 1 : nLen;
+  const n = bytesToBigInt(hasLeadingZero ? nBytes.slice(1) : nBytes);
+  off += nLen;
+  readTag(); const eLen = readLen();
+  const e = bytesToBigInt(new Uint8Array(der.slice(off, off + eLen).split('').map(c => c.charCodeAt(0))));
+  return { n, e, k: keyLen };
+}
+
+function rsaEncrypt(msg, pubB64) {
+  const { n, e, k } = parseRSAPublicKey(pubB64);
+  const mb = new TextEncoder().encode(msg);
+  const padLen = k - mb.length - 3;
+  if (padLen < 8) throw new Error('msg too long');
+  const p = new Uint8Array(k);
+  p[0] = 0x00; p[1] = 0x02;
+  for (let i = 2; i < 2 + padLen; i++) { let b; do { b = Math.floor(Math.random() * 256); } while (b === 0); p[i] = b; }
+  p[2 + padLen] = 0x00; p.set(mb, 2 + padLen + 1);
+  return btoa(String.fromCharCode(...bigIntToBytes(modPow(bytesToBigInt(p), e, n), k)));
+}
+
 function decodeSnapApp(args) {
   let [h, u, n, t, e, r] = args;
   const tNum = Number(t), eNum = Number(e);
@@ -271,6 +329,27 @@ async function instagramScrape(url) {
   return { result: '', title };
 }
 
+async function fvidgoFacebook(url) {
+  const enc = rsaEncrypt(Date.now().toString(), FVIDGO_PUB_KEY);
+  const resp = await fetch('https://api.hitube.io/st-tik-video/fb/dl2?url=' + encodeURIComponent(url) + '&sessionid=' + Date.now(), {
+    headers: { 'X-Secure-Message': enc }
+  });
+  const data = await resp.json();
+  if (data.code !== 200 || !data.result?.fbBos?.length) throw new Error('fvidgo: no media');
+  const title = data.result.title || '';
+  const media = data.result.fbBos.map(item => {
+    const jwt = item.multiResolutions?.[0]?.url || item.url;
+    return 'https://api.hitube.io/st-tik/token/' + jwt;
+  });
+  return { result: media[0], title, media, type: 'image' };
+}
+
+function addFvidgoAuth(fetchOpts) {
+  const enc = rsaEncrypt(Date.now().toString(), FVIDGO_PUB_KEY);
+  fetchOpts.headers = fetchOpts.headers || {};
+  fetchOpts.headers['X-Secure-Message'] = enc;
+}
+
 async function genericFallback(url) {
   const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   const html = await resp.text();
@@ -294,9 +373,10 @@ export async function onRequest(context) {
   if (mode === 'preview') {
     const imgUrl = params.get('url');
     if (!imgUrl) return jsonResponse({ error: 'Missing url' }, 400);
-    const resp = await fetch(decodeURIComponent(imgUrl), {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
+    const decodedUrl = decodeURIComponent(imgUrl);
+    const fetchOpts = { headers: { 'User-Agent': 'Mozilla/5.0' } };
+    if (decodedUrl.includes('api.hitube.io')) addFvidgoAuth(fetchOpts);
+    const resp = await fetch(decodedUrl, fetchOpts);
     const headers = new Headers(resp.headers);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Cache-Control', 'public, max-age=86400');
@@ -309,9 +389,10 @@ export async function onRequest(context) {
     const dlName = params.get('name') || 'video';
     const dlType = params.get('type') || '';
     if (!dlUrl) return jsonResponse({ error: 'Missing url' }, 400);
-    const resp = await fetch(decodeURIComponent(dlUrl), {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
+    const decodedUrl = decodeURIComponent(dlUrl);
+    const fetchOpts = { headers: { 'User-Agent': 'Mozilla/5.0' } };
+    if (decodedUrl.includes('api.hitube.io')) addFvidgoAuth(fetchOpts);
+    const resp = await fetch(decodedUrl, fetchOpts);
     const headers = new Headers(resp.headers);
     const safeName = dlName.replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
     const ext = dlType === 'image' ? 'jpg' : (dlUrl.match(/\.(mp4|webm|mkv|avi|mov|jpg|jpeg|png|webp|gif)(\?|$)/)?.[1] || 'mp4');
@@ -360,7 +441,8 @@ export async function onRequest(context) {
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
       let result;
-      try { result = await snapsaveFetch(url); } catch (e) {}
+      try { result = await fvidgoFacebook(url); } catch (e) {}
+      if (!result) try { result = await snapsaveFetch(url); } catch (e) {}
       if (!result) {
         try {
           const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
