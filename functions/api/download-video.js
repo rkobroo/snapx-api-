@@ -453,8 +453,9 @@ export async function onRequest(context) {
     }
 
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      try { return jsonResponse(await abYoutube(url)); } catch (e) {}
-      try { return jsonResponse(await ytScrapeFallback(url)); } catch (e) {}
+      const ytUrl = url.replace(/\/shorts\//, '/watch?v=');
+      try { return jsonResponse(await abYoutube(ytUrl)); } catch (e) {}
+      try { return jsonResponse(await ytScrapeFallback(ytUrl)); } catch (e) {}
       return jsonResponse({ error: 'YouTube download failed' }, 500);
     }
 
