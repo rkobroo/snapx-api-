@@ -1,0 +1,11 @@
+﻿{
+  "name": "rko-tv",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "npx wrangler pages deploy . --project-name rko-tv"
+  },
+  "dependencies": {
+    "ab-downloader": "^1.0.2"
+  }
+}
