@@ -370,15 +370,17 @@ export async function onRequest(context) {
         } catch (e2) {}
       }
       if (!result) {
-        try {
-          const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        async function fbScrape(hostUrl) {
+          const page = await fetch(hostUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
           const html = await page.text();
           const img = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1];
-          if (img) {
-            const title = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1] || '';
-            result = { result: img, title: decodeHtmlEntities(title.trim()), type: 'image', media: [img] };
-          }
-        } catch (e2) {}
+          if (!img) throw new Error('no image');
+          const title = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1] || '';
+          return { result: img, title: decodeHtmlEntities(title.trim()), type: 'image', media: [img] };
+        }
+        try { result = await fbScrape(url); } catch (e) {
+          try { result = await fbScrape(url.replace('://www.facebook.com', '://mbasic.facebook.com').replace('://facebook.com', '://mbasic.facebook.com').replace('://fb.watch', '://mbasic.facebook.com')); } catch (e2) {}
+        }
       }
       if (!result) return jsonResponse({ error: 'Facebook download failed' }, 500);
       if (!result.title || result.title === '...' || result.title === '….') {
