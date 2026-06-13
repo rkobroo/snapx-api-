@@ -25,8 +25,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .video-wrap{margin-top:12px;display:none}
 .video-wrap.show{display:block}
 .video-wrap video{width:100%;border-radius:10px}
-.meta{margin-top:8px;padding:12px;background:rgba(0,0,0,.25);border-radius:8px;display:none}
-.meta.show{display:block}
+.meta{margin-top:8px;padding:12px;background:rgba(0,0,0,.25);border-radius:8px}
 .meta .title{font-size:14px;line-height:1.5;color:#ccc}
 .dl-wrap{margin-top:14px}
 .dl-wrap a{text-decoration:none}
@@ -63,13 +62,12 @@ async function load(){
   if(!url)return;
   go.disabled=true;loading.classList.add('show');
   videoWrap.classList.remove('show');video.src='';
-  meta.classList.remove('show');errMsg.classList.remove('show');
+  errMsg.classList.remove('show');
   try{
     const r=await fetch('/api/download-video?url='+encodeURIComponent(url));
     const d=await r.json();
     if(d.error)throw new Error(d.error);
     label.textContent=d.title||'';
-    if(d.title)meta.classList.add('show');
     if(d.result){video.src=d.result;videoWrap.classList.add('show')}
     const dlName=d.title||'video';
     dlLink.href='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName);
