@@ -391,7 +391,9 @@ export async function onRequest(context) {
     const headers = new Headers(resp.headers);
     const safeName = dlName.replace(/[^\x20-\x7E]/g, ' ').replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
     const ext = dlType === 'image' ? 'jpg' : (dlUrl.match(/\.(mp4|webm|mkv|avi|mov|jpg|jpeg|png|webp|gif)(\?|$)/)?.[1] || 'mp4');
-    headers.set('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
+    const cleanOrig = dlName.replace(/[\\\/:*?"<>|]/g, '_').trim() || 'video';
+    const enc = encodeURIComponent(cleanOrig).replace(/%20/g, ' ');
+    headers.set('Content-Disposition', `attachment; filename="${safeName}.${ext}"; filename*=UTF-8''${enc}.${ext}`);
     headers.set('Access-Control-Allow-Origin', '*');
     return new Response(resp.body, { status: resp.status, headers });
   }
