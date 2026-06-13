@@ -182,15 +182,16 @@ async function tikwmFetch(url) {
   };
 }
 
-async function abBackendFetch(endpoint, url) {
+async function abBackendFetch(endpoint, url, signal) {
   const resp = await fetch(`https://backend1.tioo.eu.org/${endpoint}?url=${encodeURIComponent(url)}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0' }
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal
   });
   return await resp.json();
 }
 
-async function abYoutube(url) {
-  const data = await abBackendFetch('youtube', url);
+async function abYoutube(url, signal) {
+  const data = await abBackendFetch('youtube', url, signal);
   const mp4 = Array.isArray(data.mp4) ? data.mp4[0]?.url : data.mp4;
   if (!mp4) throw new Error('No YouTube URL from backend');
   return {
@@ -232,30 +233,56 @@ async function abInstagram(url) {
 async function ytScrapeFallback(url) {
   const id = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/)?.[1];
   if (!id) throw new Error('Could not extract YouTube ID');
-  let title = '', preview = '';
-  const resp = await fetch(`https://www.youtube.com/watch?v=${id}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0', 'accept-language': 'en-US,en;q=0.9' }
-  });
-  const html = await resp.text();
+  let title = '', preview = '', videoUrl = '';
+  // Try invidious API first
   try {
-    const startIdx = html.indexOf('ytInitialPlayerResponse');
-    if (startIdx !== -1) {
-      const braceIdx = html.indexOf('{', startIdx);
-      if (braceIdx !== -1) {
-        let depth = 0;
-        let endIdx = -1;
-        for (let i = braceIdx; i < html.length; i++) {
-          if (html[i] === '{') depth++;
-          else if (html[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
-        }
-        if (endIdx > 0) {
-          const data = JSON.parse(html.slice(braceIdx, endIdx));
-          title = data?.videoDetails?.title || '';
-          preview = data?.videoDetails?.thumbnail?.thumbnails?.slice(-1)[0]?.url || '';
-        }
-      }
-    }
+    const inv = await fetch(`https://inv.nadeko.net/api/v1/videos/${id}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const invData = await inv.json();
+    if (invData?.title) title = invData.title;
+    if (invData?.author?.avatar) preview = invData.author.avatar;
+    const fmt = invData?.formatStreams?.find(f => f.container === 'mp4' && f.resolutionLabel?.includes('720'));
+    const fmt2 = invData?.formatStreams?.find(f => f.container === 'mp4');
+    if (fmt?.url) videoUrl = fmt.url;
+    else if (fmt2?.url) videoUrl = fmt2.url;
   } catch (e) {}
+  // Fallback: scrape YouTube page
+  if (!videoUrl || !title) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 6000);
+      const resp = await fetch(`https://www.youtube.com/watch?v=${id}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'accept-language': 'en-US,en;q=0.9' },
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      const html = await resp.text();
+      try {
+        const startIdx = html.indexOf('ytInitialPlayerResponse');
+        if (startIdx !== -1) {
+          const braceIdx = html.indexOf('{', startIdx);
+          if (braceIdx !== -1) {
+            let depth = 0, endIdx = -1;
+            for (let i = braceIdx; i < html.length; i++) {
+              if (html[i] === '{') depth++;
+              else if (html[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+            }
+            if (endIdx > 0) {
+              const data = JSON.parse(html.slice(braceIdx, endIdx));
+              if (!title) title = data?.videoDetails?.title || '';
+              if (!preview) preview = data?.videoDetails?.thumbnail?.thumbnails?.slice(-1)[0]?.url || '';
+              if (!videoUrl) {
+                const all = [...(data?.streamingData?.formats || []), ...(data?.streamingData?.adaptiveFormats || [])];
+                const withUrl = all.find(f => f.url);
+                if (withUrl?.url) videoUrl = withUrl.url;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    } catch (e) {}
+  }
   if (!title) {
     try {
       const oembed = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`, {
@@ -267,8 +294,8 @@ async function ytScrapeFallback(url) {
     } catch (e) {}
   }
   if (!preview) preview = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
-  const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1`;
-  return { result: embedUrl, title, preview, type: 'embed' };
+  if (videoUrl) return { result: videoUrl, title, preview };
+  return { result: `https://www.youtube.com/embed/${id}?autoplay=1`, title, preview, type: 'embed' };
 }
 
 async function twitterSyndication(url) {
@@ -453,8 +480,14 @@ export async function onRequest(context) {
     }
 
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const ytUrl = url.replace(/\/shorts\//, '/watch?v=');
-      try { return jsonResponse(await abYoutube(ytUrl)); } catch (e) {}
+      const ytUrl = url.split('?')[0].replace(/\/shorts\//, '/watch?v=');
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 8000);
+        const res = await abYoutube(ytUrl, ctrl.signal);
+        clearTimeout(tid);
+        return jsonResponse(res);
+      } catch (e) {}
       try { return jsonResponse(await ytScrapeFallback(ytUrl)); } catch (e) {}
       return jsonResponse({ error: 'YouTube download failed' }, 500);
     }
