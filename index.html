@@ -77,7 +77,7 @@ async function load(){
       const isImg=d.type==='image'||d.result.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
       if(isImg){
         const imgs=d.media&&d.media.length?d.media:[d.result];
-        imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const img=document.createElement('img');img.src=u;const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
+        imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const img=document.createElement('img');img.src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
         imgGrid.style.display='flex';videoWrap.classList.add('show')
       }else{video.src='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName)+'&type=video';video.style.display='block';videoWrap.classList.add('show')}
     }
