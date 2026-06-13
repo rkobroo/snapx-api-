@@ -38,6 +38,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .dl-wrap button{width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);font-size:15px;padding:14px}
 .error{color:#f87171;font-size:13px;margin-top:12px;text-align:center;display:none}
 .error.show{display:block}
+.lightbox{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:999;justify-content:center;align-items:center;cursor:pointer}
+.lightbox.show{display:flex}
+.lightbox img{max-width:90vw;max-height:90vh;border-radius:8px;cursor:default;object-fit:contain}
+.lightbox-close{position:absolute;top:16px;right:20px;color:#fff;font-size:36px;cursor:pointer;z-index:1000;line-height:1}
+.lightbox-prev,.lightbox-next{position:absolute;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;padding:20px;z-index:1000;user-select:none;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.lightbox-prev{left:10px}
+.lightbox-next{right:10px}
 </style>
 </head>
 <body>
@@ -58,9 +65,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="dl-wrap"><a id="dlLink" target="_blank" rel="noopener"><button>Download</button></a></div>
 <div class="error" id="errMsg"></div>
 </div>
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+  <span class="lightbox-prev" onclick="event.stopPropagation();navLightbox(-1)">&#10094;</span>
+  <img class="lightbox-img" id="lightboxImg" onclick="event.stopPropagation()">
+  <span class="lightbox-next" onclick="event.stopPropagation();navLightbox(1)">&#10095;</span>
+</div>
 <script>
 const $=(id)=>document.getElementById(id);
 const input=$('url'),go=$('go'),loading=$('loading');
+let lbImgs=[],lbIdx=0;
 const meta=$('meta'),label=$('label'),videoWrap=$('videoWrap'),video=$('video'),imgContainer=$('imgContainer'),imgGrid=$('imgGrid');
 const dlLink=$('dlLink'),errMsg=$('errMsg');
 
@@ -80,7 +94,7 @@ async function load(){
       const isImg=d.type==='image'||d.result.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
       if(isImg){
         const imgs=d.media&&d.media.length?d.media:[d.result];
-        imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const img=document.createElement('img');img.src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
+        lbImgs=imgs;imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const previewUrl=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;const img=document.createElement('img');img.src=previewUrl;img.onclick=()=>{lbIdx=i;document.getElementById('lightboxImg').src=previewUrl;document.getElementById('lightbox').classList.add('show')};img.style.cursor='pointer';const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
         imgGrid.style.display='flex';videoWrap.classList.add('show')
       }else{video.src='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName)+'&type=video';video.style.display='block';videoWrap.classList.add('show')}
     }
@@ -92,6 +106,10 @@ input.addEventListener('keydown',e=>e.key==='Enter'&&load());
 input.addEventListener('input',()=>document.getElementById('clearBtn').style.display=input.value?'block':'none');
 function clearUrl(){input.value='';document.getElementById('clearBtn').style.display='none';input.focus()}
 function copyTitle(){navigator.clipboard.writeText(document.getElementById('label').textContent).then(()=>{const b=document.getElementById('copyBtn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000)})}
+function openLightbox(i){lbIdx=i;const u=lbImgs[i];document.getElementById('lightboxImg').src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;document.getElementById('lightbox').classList.add('show')}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('show')}
+function navLightbox(d){lbIdx=(lbIdx+d+lbImgs.length)%lbImgs.length;openLightbox(lbIdx)}
+document.addEventListener('keydown',e=>e.key==='Escape'&&closeLightbox())
 </script>
 </body>
 </html>
