@@ -105,7 +105,7 @@ input.addEventListener('keydown',e=>e.key==='Enter'&&load());
 input.addEventListener('input',()=>document.getElementById('clearBtn').style.display=input.value?'block':'none');
 function clearUrl(){input.value='';document.getElementById('clearBtn').style.display='none';input.focus()}
 function copyTitle(){navigator.clipboard.writeText(document.getElementById('label').textContent).then(()=>{const b=document.getElementById('copyBtn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000)})}
-function downloadMedia(){if(!dlUrl)return;window.open(dlUrl)}
+function downloadMedia(){if(!dlUrl)return;const a=document.createElement('a');a.href=dlUrl;a.download='';a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a)}
 
 function openLightbox(i){lbIdx=i;const u=lbImgs[i];document.getElementById('lightboxImg').src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;document.getElementById('lightbox').classList.add('show')}
 function closeLightbox(){document.getElementById('lightbox').classList.remove('show')}
