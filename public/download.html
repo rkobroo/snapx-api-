@@ -71,9 +71,9 @@ async function load(){
     const d=await r.json();
     if(d.error)throw new Error(d.error);
     label.textContent=d.title||'';
-    if(d.result){video.src=d.result;videoWrap.classList.add('show')}
     const dlName=d.title||'video';
-    dlLink.href='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName);
+    if(d.result){video.src='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName);videoWrap.classList.add('show')}
+    dlLink.href=video.src;
   }catch(e){errMsg.textContent=e.message;errMsg.classList.add('show')}
   finally{go.disabled=false;loading.classList.remove('show')}
 }
