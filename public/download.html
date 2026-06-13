@@ -41,6 +41,7 @@
     <div class="error" id="error"></div>
     <div class="result" id="result">
       <div id="titleArea" style="margin-top:8px;font-size:14px"></div>
+      <img id="previewArea" style="width:100%;margin-top:10px;border-radius:8px;display:none">
       <div style="margin-top:12px"><a id="dlLink" target="_blank" rel="noopener"><button style="background:linear-gradient(135deg,#28a745,#209139)">Download Video</button></a></div>
     </div>
   </div>
@@ -62,6 +63,9 @@
         if (data.error) throw new Error(data.error);
         document.getElementById('dlLink').href = data.result;
         document.getElementById('titleArea').textContent = data.title || '';
+        const prev = document.getElementById('previewArea');
+        if (data.preview) { prev.src = data.preview; prev.style.display = 'block'; }
+        else { prev.style.display = 'none'; }
         result.classList.add('show');
       } catch (e) {
         error.textContent = e.message;

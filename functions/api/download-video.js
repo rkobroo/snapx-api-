@@ -107,7 +107,7 @@ async function tikwmFetch(url) {
     result: data.data.play,
     title: data.data.title || '',
     author: data.data.author?.nickname || '',
-    full_data: data.data
+    preview: data.data.cover || ''
   };
 }
 
