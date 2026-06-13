@@ -289,7 +289,7 @@ export async function onRequest(context) {
     });
     const headers = new Headers(resp.headers);
     const safeName = dlName.replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
-    const ext = dlUrl.match(/\.(mp4|webm|mkv|avi|mov)(\?|$)/)?.[1] || 'mp4';
+    const ext = dlUrl.match(/\.(mp4|webm|mkv|avi|mov|jpg|jpeg|png|webp|gif)(\?|$)/)?.[1] || 'mp4';
     headers.set('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
     headers.set('Access-Control-Allow-Origin', '*');
     return new Response(resp.body, { status: resp.status, headers });
