@@ -79,7 +79,7 @@ async function load(){
   const url=input.value.trim();
   if(!url)return;
   go.disabled=true;loading.classList.add('show');
-  videoWrap.classList.remove('show');video.src='';video.style.display='none';imgContainer.style.display='none';imgContainer.innerHTML='';imgGrid.innerHTML='';
+  videoWrap.classList.remove('show');video.src='';video.style.display='none';imgContainer.style.display='none';imgContainer.innerHTML='';imgGrid.innerHTML='';videoWrap.querySelector('iframe')?.remove();dlLink.style.display='';
   errMsg.classList.remove('show');
   try{
     const r=await fetch('/api/download-video?url='+encodeURIComponent(url));
@@ -93,7 +93,8 @@ async function load(){
         const imgs=d.media&&d.media.length?d.media:[d.result];
         lbImgs=imgs;imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const previewUrl=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;const img=document.createElement('img');img.src=previewUrl;img.onclick=()=>{lbIdx=i;document.getElementById('lightboxImg').src=previewUrl;document.getElementById('lightbox').classList.add('show')};img.style.cursor='pointer';const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
         imgGrid.style.display='flex';videoWrap.classList.add('show')
-      }else{video.src='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName)+'&type=video';video.style.display='block';videoWrap.classList.add('show')}
+      }else if(d.type==='embed'){const f=document.createElement('iframe');f.src=d.result;f.style.cssText='width:100%;aspect-ratio:16/9;border:none;border-radius:10px';f.allow='autoplay; encrypted-media';f.allowFullscreen=true;videoWrap.appendChild(f);videoWrap.classList.add('show');dlLink.style.display='none'}
+      else{video.src='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName)+'&type=video';video.style.display='block';videoWrap.classList.add('show')}
     }
     dlLink.href='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName)+'&type='+(d.type==='image'?'image':'video');
   }catch(e){errMsg.textContent=e.message;errMsg.classList.add('show')}
