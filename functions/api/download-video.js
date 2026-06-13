@@ -389,7 +389,7 @@ export async function onRequest(context) {
     if (decodedUrl.includes('api.hitube.io')) addFvidgoAuth(fetchOpts);
     const resp = await fetch(decodedUrl, fetchOpts);
     const headers = new Headers(resp.headers);
-    const safeName = dlName.replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
+    const safeName = dlName.replace(/[^\x20-\x7E]/g, ' ').replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
     const ext = dlType === 'image' ? 'jpg' : (dlUrl.match(/\.(mp4|webm|mkv|avi|mov|jpg|jpeg|png|webp|gif)(\?|$)/)?.[1] || 'mp4');
     headers.set('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
     headers.set('Access-Control-Allow-Origin', '*');
