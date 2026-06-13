@@ -422,27 +422,37 @@ export async function onRequest(context) {
   try {
     if (url.includes('tiktok.com') || url.includes('tikwm.com')) {
       let result;
-      if (url.includes('/photo/')) {
-        try { result = await abTikTok(url); } catch (e) {}
-      }
+      try { result = await abTikTok(url); } catch (e) {}
       if (!result) try { result = await snaptikFetch(url); } catch (e) {}
       if (!result) try { result = await tikwmFetch(url); } catch (e) {}
-      if (!result) try { result = await abTikTok(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
+      // Always try to get a fresh title from OEmbed
+      let freshTitle = '';
       try {
         const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
           headers: { 'User-Agent': 'Mozilla/5.0' }
         });
         const o = await oembed.json();
-        if (o.title || o.description) result.title = o.title || o.description;
-      } catch (e) {
+        const t = (o.title || o.description || '').replace(/ - TikTok$/, '').trim();
+        if (t) freshTitle = t;
+      } catch (e) {}
+      if (!freshTitle) {
         try {
           const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
           const html = await page.text();
-          const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
-          if (m) result.title = decodeHtmlEntities(m[1].replace(/ - TikTok$/, '').trim());
+          const ogDesc = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
+          if (ogDesc) freshTitle = decodeHtmlEntities(ogDesc[1].trim());
+          else {
+            const ogT = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
+            if (ogT) freshTitle = decodeHtmlEntities(ogT[1].trim());
+            else {
+              const mt = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+              if (mt) freshTitle = decodeHtmlEntities(mt[1].replace(/ - TikTok$/, '').trim());
+            }
+          }
         } catch (e2) {}
       }
+      if (freshTitle) result.title = freshTitle;
       return jsonResponse(result);
     }
 
