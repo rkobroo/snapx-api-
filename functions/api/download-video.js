@@ -129,6 +129,26 @@ async function abYoutube(url) {
   };
 }
 
+async function abTikTok(url) {
+  const data = await abBackendFetch('tiktok', url);
+  if (!data?.data) throw new Error('No TikTok data from backend');
+  if (data.data.images?.length) {
+    return {
+      result: data.data.images[0],
+      title: data.data.title || '',
+      preview: data.data.cover || '',
+      media: data.data.images,
+      type: 'image'
+    };
+  }
+  if (!data.data.play) throw new Error('No video URL from backend');
+  return {
+    result: data.data.play,
+    title: data.data.title || '',
+    preview: data.data.cover || ''
+  };
+}
+
 async function abInstagram(url) {
   const data = await abBackendFetch('igdl', url);
   if (!data?.[0]?.url) throw new Error('No Instagram URL from backend');
@@ -308,8 +328,12 @@ export async function onRequest(context) {
   try {
     if (url.includes('tiktok.com') || url.includes('tikwm.com')) {
       let result;
-      try { result = await snaptikFetch(url); } catch (e) {}
+      if (url.includes('/photo/')) {
+        try { result = await abTikTok(url); } catch (e) {}
+      }
+      if (!result) try { result = await snaptikFetch(url); } catch (e) {}
       if (!result) try { result = await tikwmFetch(url); } catch (e) {}
+      if (!result) try { result = await abTikTok(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
       try {
         const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
