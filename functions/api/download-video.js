@@ -301,21 +301,19 @@ export async function onRequest(context) {
       try { result = await snaptikFetch(url); } catch (e) {}
       if (!result) try { result = await tikwmFetch(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
-      if (!result.title) {
+      try {
+        const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const o = await oembed.json();
+        if (o.title || o.description) result.title = o.title || o.description;
+      } catch (e) {
         try {
-          const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-          });
-          const o = await oembed.json();
-          result.title = o.title || o.description || '';
-        } catch (e) {
-          try {
-            const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-            const html = await page.text();
-            const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
-            if (m) result.title = decodeHtmlEntities(m[1].replace(/ - TikTok$/, '').trim());
-          } catch (e2) {}
-        }
+          const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const html = await page.text();
+          const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+          if (m) result.title = decodeHtmlEntities(m[1].replace(/ - TikTok$/, '').trim());
+        } catch (e2) {}
       }
       return jsonResponse(result);
     }
