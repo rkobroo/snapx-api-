@@ -268,7 +268,7 @@ export async function onRequest(context) {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     const headers = new Headers(resp.headers);
-    const safeName = dlName.replace(/[^\x20-\x7E]/g, ' ').replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
+    const safeName = dlName.replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'video';
     const ext = dlUrl.match(/\.(mp4|webm|mkv|avi|mov)(\?|$)/)?.[1] || 'mp4';
     headers.set('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
     headers.set('Access-Control-Allow-Origin', '*');
