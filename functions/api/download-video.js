@@ -1,5 +1,17 @@
 ﻿import { jsonResponse, handleOptions } from './_utils.js';
 
+function decodeJsString(str) {
+  return str.replace(/\\u([\dA-Fa-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\(["\\\/nrt])/g, (_, c) => ({'"':'"', '\\':'\\', '/':'/', 'n':'\n', 'r':'\r', 't':'\t'})[c]);
+}
+
+function decodeHtmlEntities(str) {
+  return str.replace(/&#x([\dA-Fa-f]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&apos;/g, "'");
+}
+
 function decodeSnapApp(args) {
   let [h, u, n, t, e, r] = args;
   const tNum = Number(t), eNum = Number(e);
@@ -50,7 +62,7 @@ function extractMedia(html) {
   return {
     url,
     thumbnail: thumbMatch?.[1] || '',
-    description: descMatch?.[1]?.trim() || ''
+    description: decodeHtmlEntities(descMatch?.[1]?.trim() || '')
   };
 }
 
@@ -202,14 +214,15 @@ async function snaptikFetch(url) {
   const enc = getEncodedSnapApp(text);
   if (!enc) throw new Error('Failed to get snaptik encoded data');
   const decoded = decodeSnapApp(enc);
-  const innerHtml = decoded.split('$("#download").innerHTML = "')[1]?.split('";')[0]?.replace(/\\(\\)?/g, '');
+  const innerHtml = decoded.split('$("#download").innerHTML = "')[1]?.split('";')[0];
   if (!innerHtml) throw new Error('Failed to extract snaptik HTML');
-  const link = innerHtml.match(/<a[^>]*href="([^"]+)"[^>]*>/);
+  const cleanHtml = decodeJsString(innerHtml);
+  const link = cleanHtml.match(/<a[^>]*href="([^"]+)"[^>]*>/);
   if (!link) throw new Error('No download link from snaptik');
-  const title = innerHtml.match(/<div class="video-title">([\s\S]*?)<\/div>/)?.[1]?.trim() || '';
-  const thumb = innerHtml.match(/<img[^>]*src="(https?[^"]+)"[^>]*>/)?.[1] || '';
-  const author = innerHtml.match(/<div class="info">[\s\S]*?<span>([\s\S]*?)<\/span>/)?.[1]?.trim() || '';
-  const fullTitle = [title, author].filter(Boolean).join(' ΓÇö ');
+  const title = decodeHtmlEntities(cleanHtml.match(/<div class="video-title">([\s\S]*?)<\/div>/)?.[1]?.trim() || '');
+  const thumb = cleanHtml.match(/<img[^>]*src="(https?[^"]+)"[^>]*>/)?.[1] || '';
+  const author = decodeHtmlEntities(cleanHtml.match(/<div class="info">[\s\S]*?<span>([\s\S]*?)<\/span>/)?.[1]?.trim() || '');
+  const fullTitle = [title, author].filter(Boolean).join(' — ');
   return { result: link[1], title: fullTitle, preview: thumb };
 }
 
@@ -219,7 +232,7 @@ async function instagramScrape(url) {
   });
   const html = await resp.text();
   const og = html.match(/og:title.*?content="([^"]+)"/);
-  const title = og ? og[1].replace(/&quot;/g, '"').replace(/&#x?\w+;/g, '').trim() : '';
+  const title = og ? decodeHtmlEntities(og[1].replace(/&quot;/g, '"').trim()) : '';
   const vidUrl = html.match(/<meta[^>]*property="og:video"[^>]*content="([^"]+)"/)?.[1]
     || html.match(/<video[^>]*src="([^"]+)"/)?.[1]
     || html.match(/"video_url":"([^"]+)"/)?.[1];
