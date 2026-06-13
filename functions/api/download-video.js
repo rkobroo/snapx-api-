@@ -239,6 +239,11 @@ async function instagramScrape(url) {
     || html.match(/<video[^>]*src="([^"]+)"/)?.[1]
     || html.match(/"video_url":"([^"]+)"/)?.[1];
   if (vidUrl) return { result: vidUrl, title };
+  const imgUrl = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1]
+    || html.match(/<img[^>]*class="[^"]*photo[^"]*"[^>]*src="([^"]+)"/)?.[1];
+  if (imgUrl) return { result: imgUrl, title, type: 'image' };
+  const allImgs = [...html.matchAll(/"display_url":"([^"]+)"/g)].map(m => m[1]);
+  if (allImgs.length) return { result: allImgs[0], title, media: allImgs, type: 'image' };
   return { result: '', title };
 }
 
@@ -352,20 +357,21 @@ export async function onRequest(context) {
     }
 
     if (url.includes('instagram.com')) {
+      let result;
       try {
-        const result = await snapsaveFetch(url);
-        if (!result.title) {
-          const { title } = await instagramScrape(url);
-          if (title) result.title = title;
-        }
+        result = await snapsaveFetch(url);
+        const scrape = await instagramScrape(url);
+        if (scrape.title) result.title = scrape.title;
+        if (scrape.type) result.type = scrape.type;
+        if (scrape.media) result.media = scrape.media;
         return jsonResponse(result);
       } catch (e) {}
       try {
-        const result = await abInstagram(url);
-        if (!result.title) {
-          const { title } = await instagramScrape(url);
-          if (title) result.title = title;
-        }
+        result = await abInstagram(url);
+        const scrape = await instagramScrape(url);
+        if (scrape.title) result.title = scrape.title;
+        if (scrape.type) result.type = scrape.type;
+        if (scrape.media) result.media = scrape.media;
         return jsonResponse(result);
       } catch (e) {}
       const fallback = await instagramScrape(url);
