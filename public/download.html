@@ -26,7 +26,6 @@
     .loading.show { display: block; }
     .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #4a9eff; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
     .info { font-size: 13px; color: #8899aa; margin-top: 16px; text-align: center; }
     .info span { display: inline-block; margin: 0 6px; color: #4a9eff; }
   </style>
@@ -41,12 +40,10 @@
     <div class="loading" id="loading"><div class="spinner"></div></div>
     <div class="error" id="error"></div>
     <div class="result" id="result">
-
       <div id="titleArea" style="margin-top:8px;font-size:14px"></div>
       <div style="margin-top:12px"><a id="dlLink" target="_blank" rel="noopener"><button style="background:linear-gradient(135deg,#28a745,#209139)">Download Video</button></a></div>
     </div>
   </div>
-
   <script>
     async function download() {
       const url = document.getElementById('url').value.trim();
@@ -59,22 +56,12 @@
       result.classList.remove('show');
       btn.disabled = true;
       loading.classList.add('show');
-
       try {
         const resp = await fetch('/api/download-video?url=' + encodeURIComponent(url));
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
-
         document.getElementById('dlLink').href = data.result;
         document.getElementById('titleArea').textContent = data.title || '';
-        const pa = document.getElementById('previewArea');
-
-
-
-
-
-
-
         result.classList.add('show');
       } catch (e) {
         error.textContent = e.message;
@@ -84,7 +71,6 @@
         loading.classList.remove('show');
       }
     }
-
     document.getElementById('url').addEventListener('keydown', e => { if (e.key === 'Enter') download(); });
   </script>
 </body>
