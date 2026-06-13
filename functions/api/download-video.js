@@ -132,7 +132,7 @@ async function abYoutube(url) {
 async function abInstagram(url) {
   const data = await abBackendFetch('igdl', url);
   if (!data?.[0]?.url) throw new Error('No Instagram URL from backend');
-  const allUrls = data.map(i => i.url).filter(Boolean);
+  const allUrls = [...new Set(data.map(i => i.url).filter(Boolean))];
   return {
     result: data[0].url,
     title: '',
