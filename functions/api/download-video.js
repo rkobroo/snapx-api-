@@ -295,7 +295,7 @@ async function ytScrapeFallback(url) {
   }
   if (!preview) preview = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
   if (videoUrl) return { result: videoUrl, title, preview };
-  return { result: `https://www.youtube.com/embed/${id}?autoplay=1`, title, preview, type: 'embed' };
+  throw new Error('No downloadable video found');
 }
 
 async function twitterSyndication(url) {
@@ -483,7 +483,7 @@ export async function onRequest(context) {
       const ytUrl = url.split('?')[0].replace(/\/shorts\//, '/watch?v=');
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 8000);
+        const tid = setTimeout(() => ctrl.abort(), 15000);
         const res = await abYoutube(ytUrl, ctrl.signal);
         clearTimeout(tid);
         return jsonResponse(res);
