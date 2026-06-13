@@ -19,6 +19,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .loading.show{display:block}
 .spinner{display:inline-block;width:28px;height:28px;border:3px solid rgba(255,255,255,.15);border-top-color:#4a9eff;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.preview{margin-top:12px;display:none}
+.preview.show{display:block}
+.preview img{width:100%;border-radius:10px;max-height:320px;object-fit:cover}
 .meta{margin-top:12px;padding:12px;background:rgba(0,0,0,.25);border-radius:8px;display:none}
 .meta.show{display:block}
 .meta .title{font-size:14px;line-height:1.5;color:#ccc}
@@ -39,26 +42,28 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </div>
 <div class="loading" id="loading"><div class="spinner"></div></div>
 <div class="meta" id="meta"><div class="title" id="label"></div></div>
+<div class="preview" id="preview"><img id="thumb"></div>
 <div class="dl-wrap"><a id="dlLink" target="_blank" rel="noopener"><button>Download</button></a></div>
 <div class="error" id="errMsg"></div>
 </div>
 <script>
 const $=(id)=>document.getElementById(id);
 const input=$('url'),go=$('go'),loading=$('loading');
-const meta=$('meta'),label=$('label');
+const meta=$('meta'),label=$('label'),preview=$('preview'),thumb=$('thumb');
 const dlLink=$('dlLink'),errMsg=$('errMsg');
 
 async function load(){
   const url=input.value.trim();
   if(!url)return;
   go.disabled=true;loading.classList.add('show');
-  meta.classList.remove('show');errMsg.classList.remove('show');
+  meta.classList.remove('show');preview.classList.remove('show');errMsg.classList.remove('show');
   try{
     const r=await fetch('/api/download-video?url='+encodeURIComponent(url));
     const d=await r.json();
     if(d.error)throw new Error(d.error);
     label.textContent=d.title||'';
     if(d.title)meta.classList.add('show');
+    if(d.preview){thumb.src='/api/download-video?mode=preview&url='+encodeURIComponent(d.preview);preview.classList.add('show')}
     const dlName=d.title||'video';
     dlLink.href='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName);
   }catch(e){errMsg.textContent=e.message;errMsg.classList.add('show')}
