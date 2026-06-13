@@ -27,6 +27,10 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .video-wrap{margin-top:12px;display:none}
 .video-wrap.show{display:block}
 .video-wrap video,.video-wrap img{width:100%;border-radius:10px}
+.img-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.img-grid .item{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:8px;padding:4px;width:100%}
+.img-grid .item img{width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0}
+.img-grid .item button{padding:6px 10px;font-size:12px;white-space:nowrap}
 .meta{margin-top:8px;padding:12px;background:rgba(0,0,0,.25);border-radius:8px}
 .meta .title{font-size:14px;line-height:1.5;color:#ccc}
 .dl-wrap{margin-top:14px}
@@ -49,7 +53,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <button id="go" onclick="load()">Load</button>
 </div>
 <div class="loading" id="loading"><div class="spinner"></div></div>
-<div class="video-wrap" id="videoWrap"><video id="video" controls></video><div id="imgContainer" style="display:none"></div></div>
+<div class="video-wrap" id="videoWrap"><video id="video" controls></video><div id="imgContainer" style="display:none"></div><div class="img-grid" id="imgGrid"></div></div>
 <div class="meta" id="meta"><div class="title" id="label"></div><button id="copyBtn" style="background:none;border:none;color:#4a9eff;cursor:pointer;font-size:12px;margin-top:6px;padding:0" onclick="copyTitle()">Copy</button></div>
 <div class="dl-wrap"><a id="dlLink" target="_blank" rel="noopener"><button>Download</button></a></div>
 <div class="error" id="errMsg"></div>
@@ -57,14 +61,14 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <script>
 const $=(id)=>document.getElementById(id);
 const input=$('url'),go=$('go'),loading=$('loading');
-const meta=$('meta'),label=$('label'),videoWrap=$('videoWrap'),video=$('video'),imgContainer=$('imgContainer');
+const meta=$('meta'),label=$('label'),videoWrap=$('videoWrap'),video=$('video'),imgContainer=$('imgContainer'),imgGrid=$('imgGrid');
 const dlLink=$('dlLink'),errMsg=$('errMsg');
 
 async function load(){
   const url=input.value.trim();
   if(!url)return;
   go.disabled=true;loading.classList.add('show');
-  videoWrap.classList.remove('show');video.src='';video.style.display='none';imgContainer.style.display='none';imgContainer.innerHTML='';
+  videoWrap.classList.remove('show');video.src='';video.style.display='none';imgContainer.style.display='none';imgContainer.innerHTML='';imgGrid.innerHTML='';
   errMsg.classList.remove('show');
   try{
     const r=await fetch('/api/download-video?url='+encodeURIComponent(url));
@@ -76,8 +80,8 @@ async function load(){
       const isImg=d.type==='image'||d.result.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
       if(isImg){
         const imgs=d.media&&d.media.length?d.media:[d.result];
-        imgs.forEach(u=>{const i=document.createElement('img');i.src=u;i.style.cssText='width:100%;border-radius:10px;margin-bottom:8px';imgContainer.appendChild(i)});
-        imgContainer.style.display='block';videoWrap.classList.add('show')
+        imgs.forEach((u,i)=>{const ext=u.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i)?.[1]||'jpg';const item=document.createElement('div');item.className='item';const img=document.createElement('img');img.src=u;const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1));a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
+        imgGrid.style.display='flex';videoWrap.classList.add('show')
       }else{video.src='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName);video.style.display='block';videoWrap.classList.add('show')}
     }
     dlLink.href='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName);

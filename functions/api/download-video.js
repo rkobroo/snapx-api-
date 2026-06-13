@@ -239,11 +239,11 @@ async function instagramScrape(url) {
     || html.match(/<video[^>]*src="([^"]+)"/)?.[1]
     || html.match(/"video_url":"([^"]+)"/)?.[1];
   if (vidUrl) return { result: vidUrl, title };
+  const allImgs = [...new Set([...html.matchAll(/"display_url":"([^"]+)"/g)].map(m => m[1]))];
+  if (allImgs.length) return { result: allImgs[0], title, media: allImgs, type: 'image' };
   const imgUrl = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1]
     || html.match(/<img[^>]*class="[^"]*photo[^"]*"[^>]*src="([^"]+)"/)?.[1];
   if (imgUrl) return { result: imgUrl, title, type: 'image' };
-  const allImgs = [...html.matchAll(/"display_url":"([^"]+)"/g)].map(m => m[1]);
-  if (allImgs.length) return { result: allImgs[0], title, media: allImgs, type: 'image' };
   return { result: '', title };
 }
 
