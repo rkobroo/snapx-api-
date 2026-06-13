@@ -478,18 +478,20 @@ export async function onRequest(context) {
         }
       }
       if (!result) return jsonResponse({ error: 'Facebook download failed' }, 500);
-      if (!result.title || result.title === '...' || result.title === '….') {
-        try {
-          const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-          const html = await page.text();
+      try {
+        const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        const html = await page.text();
+        const desc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
+        if (desc) result.title = decodeHtmlEntities(desc[1].trim());
+        else {
           const ogt = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
-          if (ogt) result.title = decodeHtmlEntities(ogt[1].trim());
+          if (ogt && !ogt[1].includes('Facebook')) result.title = decodeHtmlEntities(ogt[1].trim());
           else {
             const t = html.match(/<title>([\s\S]*?)<\/title>/);
             if (t) result.title = decodeHtmlEntities(t[1].replace(/ \| Facebook$/, '').trim());
           }
-        } catch (e3) {}
-      }
+        }
+      } catch (e3) {}
       return jsonResponse(result);
     }
 
