@@ -1,13 +1,15 @@
 ﻿import { jsonResponse, handleOptions } from './_utils.js';
 
 function decodeJsString(str) {
-  return str.replace(/\\u([\dA-Fa-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/\\(["\\\/nrt])/g, (_, c) => ({'"':'"', '\\':'\\', '/':'/', 'n':'\n', 'r':'\r', 't':'\t'})[c]);
+  str = str.replace(/\\u([\dA-Fa-f]{4})/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+  str = str.replace(/\\u\{([\dA-Fa-f]+)\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+  str = str.replace(/\\(["\\\/nrt])/g, (_, c) => ({'"':'"', '\\':'\\', '/':'/', 'n':'\n', 'r':'\r', 't':'\t'})[c]);
+  return str;
 }
 
 function decodeHtmlEntities(str) {
-  return str.replace(/&#x([\dA-Fa-f]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+  return str.replace(/&#x([\dA-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
     .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&apos;/g, "'");
 }
