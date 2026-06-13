@@ -326,6 +326,13 @@ export async function onRequest(context) {
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
       try { return jsonResponse(await snapsaveFetch(url)); } catch (e) {}
+      try {
+        const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        const html = await page.text();
+        const urlMatch = html.match(/"playable_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/) || html.match(/"src":"([^"]+\.mp4)"/) || html.match(/video_url":"([^"]+)"/);
+        const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/) || html.match(/"message":"([^"]+)"/);
+        if (urlMatch) return { result: decodeHtmlEntities(urlMatch[1]), title: titleMatch ? decodeHtmlEntities(titleMatch[1].replace(/ \| Facebook$/, '').trim()) : '' };
+      } catch (e2) {}
       return jsonResponse({ error: 'Facebook download failed' }, 500);
     }
 
