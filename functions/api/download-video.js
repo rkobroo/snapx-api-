@@ -376,7 +376,7 @@ export async function onRequest(context) {
           const img = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1];
           if (!img) throw new Error('no image');
           const title = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1] || '';
-          return { result: img, title: decodeHtmlEntities(title.trim()), type: 'image', media: [img] };
+          return { result: decodeHtmlEntities(img), title: decodeHtmlEntities(title.trim()), type: 'image', media: [decodeHtmlEntities(img)] };
         }
         try { result = await fbScrape(url); } catch (e) {
           try { result = await fbScrape(url.replace('://www.facebook.com', '://mbasic.facebook.com').replace('://facebook.com', '://mbasic.facebook.com').replace('://fb.watch', '://mbasic.facebook.com')); } catch (e2) {}
