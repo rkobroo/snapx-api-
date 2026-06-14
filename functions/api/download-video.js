@@ -170,10 +170,17 @@ async function tikwmFetch(url) {
 }
 
 async function abBackendFetch(endpoint, url) {
-  const resp = await fetch(`https://backend1.tioo.eu.org/${endpoint}?url=${encodeURIComponent(url)}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-  });
-  return await resp.json();
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 8000);
+  try {
+    const resp = await fetch(`https://backend1.tioo.eu.org/${endpoint}?url=${encodeURIComponent(url)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: ac.signal
+    });
+    return await resp.json();
+  } finally {
+    clearTimeout(to);
+  }
 }
 
 async function abYoutube(url) {
