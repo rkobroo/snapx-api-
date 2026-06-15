@@ -392,7 +392,15 @@ export async function onRequest(context) {
     const dlType = params.get('type') || '';
     if (!dlUrl) return jsonResponse({ error: 'Missing url' }, 400);
     const decodedUrl = decodeURIComponent(dlUrl);
-    const fetchOpts = { headers: { 'User-Agent': 'Mozilla/5.0' } };
+    const fetchOpts = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        'Accept': 'video/mp4,video/webm,video/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.facebook.com/',
+        'Origin': 'https://www.facebook.com',
+      },
+    };
     if (decodedUrl.includes('api.hitube.io')) addFvidgoAuth(fetchOpts);
     const resp = await fetch(decodedUrl, fetchOpts);
     const headers = new Headers(resp.headers);
