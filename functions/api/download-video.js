@@ -352,7 +352,7 @@ async function fvidgoFacebook(url) {
     const jwt = item.multiResolutions?.[0]?.url || item.url;
     return 'https://api.hitube.io/st-tik/token/' + jwt;
   });
-  const isVideo = data.result.fbBos.some(item => item.multiResolutions?.length > 0);
+  const isVideo = /\/videos\/|\/watch\/|\/reel\/|\/share\/v\//.test(url);
   return { result: media[0], title, media, type: isVideo ? 'video' : 'image' };
 }
 
