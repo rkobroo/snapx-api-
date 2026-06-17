@@ -219,7 +219,8 @@ async function abTikTok(url) {
   return {
     result: data.data.play,
     title: data.data.title || '',
-    preview: data.data.cover || ''
+    preview: data.data.cover || '',
+    type: 'video'
   };
 }
 
@@ -228,7 +229,7 @@ async function abInstagram(url) {
   if (!data?.[0]?.url) throw new Error('No Instagram URL from backend');
   const allUrls = [...new Set(data.map(i => i.url).filter(Boolean))];
   const isVideo = data[0].url.match(/\.(mp4|webm|mkv|avi|mov)(\?|$)/i) || data[0]?.type === 'video' || url.includes('/reel/');
-  if (isVideo) return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '' };
+  if (isVideo) return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: [data[0].url], type: 'video' };
   return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: allUrls, type: 'image' };
 }
 
