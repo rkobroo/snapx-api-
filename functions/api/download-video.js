@@ -488,7 +488,7 @@ export async function onRequest(context) {
       if (!result) try { result = await tikwmFetch(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
       const freshTitle = await titlePromise;
-      if (freshTitle) result.title = freshTitle;
+      if (freshTitle && freshTitle !== 'TikTok - Make Your Day' && freshTitle !== 'TikTok') result.title = freshTitle;
       return jsonResponse(result);
     }
 
