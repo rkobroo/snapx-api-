@@ -482,10 +482,9 @@ export async function onRequest(context) {
       })();
       // Race backends: tikwmFetch is fastest, try it first alongside abTikTok
       let result;
-      try {
-        result = await firstSuccess([tikwmFetch(url), abTikTok(url)]);
-      } catch (e) {}
+      try { result = await abTikTok(url); } catch (e) {}
       if (!result) try { result = await snaptikFetch(url); } catch (e) {}
+      if (!result) try { result = await tikwmFetch(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
       const freshTitle = await titlePromise;
       if (freshTitle) result.title = freshTitle;
