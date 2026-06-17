@@ -290,6 +290,94 @@ async function twitterSyndication(url) {
   throw new Error('No media found in tweet');
 }
 
+async function createSnapxToken() {
+  const secret = 'S7O1qf3ZRyNLYA';
+  const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const data = b64url({ alg: 'HS256', typ: 'JWT' }) + '.' + b64url({ exp: Math.floor(Date.now() / 1000) + 600 });
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return data + '.' + sigB64;
+}
+
+async function snapxFetch(url) {
+  const token = await createSnapxToken();
+  const resp = await fetch(`https://api.snapx.info/v1/tiktok?url=${encodeURIComponent(url)}`, {
+    headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
+  });
+  const jsonResp = await resp.json();
+  if (jsonResp.status !== '100') throw new Error(jsonResp.message || 'snapx tiktok: request failed');
+  const videoUrl = jsonResp.dl_full_hd || jsonResp.dl || jsonResp.snapxcdn || jsonResp.url;
+  if (!videoUrl) throw new Error('No video URL from snapx tiktok');
+  return { result: videoUrl, title: jsonResp.des || jsonResp.name || '', preview: jsonResp.thumbnail || jsonResp.video_thumbnail || '', media: [{ url: videoUrl, type: 'video' }], type: 'video' };
+}
+
+async function snapxInstagram(url) {
+  const token = await createSnapxToken();
+  const resp = await fetch(`https://api.snapx.info/v1/instagram?url=${encodeURIComponent(url)}`, {
+    headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
+  });
+  const jsonResp = await resp.json();
+  if (jsonResp.status_code !== -1) throw new Error(jsonResp.message || 'snapx instagram: request failed');
+  const data = jsonResp.data;
+  if (!data) throw new Error('snapx instagram: no data');
+  const items = data.items || [];
+  const allUrls = [];
+  for (const item of items) {
+    const subItems = item.items || [];
+    if (subItems.length) {
+      for (const si of subItems) { if (si.url) allUrls.push({ url: si.url, type: 'image' }); }
+    } else if (item.video_url) {
+      allUrls.push({ url: item.video_url, type: 'video' });
+    } else if (item.display_url) {
+      allUrls.push({ url: item.display_url, type: 'image' });
+    }
+  }
+  if (!allUrls.length) {
+    if (data.video_url) allUrls.push({ url: data.video_url, type: 'video' });
+    else if (data.display_url) allUrls.push({ url: data.display_url, type: 'image' });
+  }
+  if (!allUrls.length) throw new Error('No media URL from snapx instagram');
+  const firstUrl = allUrls[0].url;
+  const isVideo = allUrls.some(m => m.type === 'video');
+  return { result: firstUrl, title: data.title || data.shortcode || '', preview: data.display_url || '', media: allUrls, type: isVideo ? 'video' : 'image' };
+}
+
+async function snapxFacebook(url) {
+  const token = await createSnapxToken();
+  const resp = await fetch(`https://api.snapx.info/v1/fb?url=${encodeURIComponent(url)}`, {
+    headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
+  });
+  const jsonResp = await resp.json();
+  if (jsonResp.error !== false) throw new Error(jsonResp.message || 'snapx facebook: request failed');
+  const d = jsonResp.data;
+  if (!d) throw new Error('snapx facebook: no data');
+  const videoUrl = d.hd || d.sd || d.thumbnail;
+  if (!videoUrl) throw new Error('No media URL from snapx facebook');
+  const isVideo = /\/videos\/|\/watch\/|\/reel\/|\/share\/v\//.test(url);
+  return { result: videoUrl, title: d.title || d.des || '', preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
+}
+
+async function snapxTwitter(url) {
+  const token = await createSnapxToken();
+  const resp = await fetch(`https://api.snapx.info/v1/twitter?url=${encodeURIComponent(url)}`, {
+    headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
+  });
+  const jsonResp = await resp.json();
+  const sc = jsonResp.status_code;
+  if (sc === null || sc === undefined || sc !== 0) throw new Error(jsonResp.message || 'snapx twitter: request failed');
+  const d = jsonResp.data;
+  if (!d) throw new Error('snapx twitter: no data');
+  const playlists = d.playlists || [];
+  let videoUrl = '';
+  for (const p of playlists) {
+    if (p.playlist_url) { videoUrl = p.playlist_url; if (p.resolution === 'hd' || p.resolution === '720') break; }
+  }
+  if (!videoUrl && playlists.length) videoUrl = playlists[0].playlist_url;
+  if (!videoUrl) throw new Error('No media URL from snapx twitter');
+  return { result: videoUrl, title: d.description || d.author_name || '', preview: d.cover_url || '', media: [{ url: videoUrl, type: 'video' }], type: 'video' };
+}
+
 async function snaptikFetch(url) {
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
   const home = await fetch('https://snaptik.app/', { headers: { 'user-agent': UA } });
@@ -482,9 +570,10 @@ export async function onRequest(context) {
         } catch (e2) {}
         return '';
       })();
-      // Race backends: tikwmFetch is fastest, try it first alongside abTikTok
+      // Race backends: snapxFetch uses reverse-engineered SnapTik API, most reliable
       let result;
-      try { result = await abTikTok(url); } catch (e) {}
+      try { result = await snapxFetch(url); } catch (e) {}
+      if (!result) try { result = await abTikTok(url); } catch (e) {}
       if (!result) try { result = await snaptikFetch(url); } catch (e) {}
       if (!result) try { result = await tikwmFetch(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
@@ -500,6 +589,8 @@ export async function onRequest(context) {
     }
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
+      let result;
+      try { result = await snapxFacebook(url); if (result) return jsonResponse(result); } catch (e) {}
       const pageInfo = (async () => {
         try {
           const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
@@ -512,7 +603,6 @@ export async function onRequest(context) {
           return { desc: desc?.[1], ogTitle: ogt?.[1], pageTitle: t?.[1], ogImage: ogi?.[1], playUrl: playUrl?.[1] };
         } catch { return {}; }
       })();
-      let result;
       const isFBVideo = /\/videos\/|\/watch\/|\/reel\/|\/share\/v\//.test(url);
       if (isFBVideo) try { result = await snapsaveFetch(url); } catch (e) {}
       if (!result) try { result = await fvidgoFacebook(url); } catch (e) {}
@@ -536,6 +626,7 @@ export async function onRequest(context) {
 
     if (url.includes('instagram.com')) {
       let result;
+      try { result = await snapxInstagram(url); if (result) return jsonResponse(result); } catch (e) {}
       try {
         result = await abInstagram(url);
         if (!result.media || result.media.length === 0) {
@@ -562,6 +653,7 @@ export async function onRequest(context) {
     }
 
     if (url.includes('twitter.com') || url.includes('x.com')) {
+      try { const r = await snapxTwitter(url); if (r) return jsonResponse(r); } catch (e) {}
       try { return jsonResponse(await snapsaveFetch(url)); } catch (e) {}
       try { return jsonResponse(await twitterSyndication(url)); } catch (e) {}
       return jsonResponse({ error: 'Twitter download failed' }, 500);
