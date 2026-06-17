@@ -160,7 +160,7 @@ async function snapsaveFetch(url, retries = 2) {
     if (!decoded) { if (attempt < retries) { await new Promise(r => setTimeout(r, 500)); continue; } throw new Error('Failed to decode snapsave response'); }
     const r = extractMedia(decoded);
     if (!r.url) { if (attempt < retries) { await new Promise(r => setTimeout(r, 500)); continue; } throw new Error('No media found'); }
-    return { result: r.url, title: r.description, preview: r.thumbnail, media: [r.url], type: 'video' };
+    return { result: r.url, title: r.description, preview: r.thumbnail, media: [{ url: r.url, type: 'video' }], type: 'video' };
   }
 }
 
@@ -211,7 +211,7 @@ async function abTikTok(url) {
       result: data.data.images[0],
       title: data.data.title || '',
       preview: data.data.cover || '',
-      media: data.data.images,
+      media: data.data.images.map(u => ({ url: u, type: 'image' })),
       type: 'image'
     };
   }
@@ -229,8 +229,8 @@ async function abInstagram(url) {
   if (!data?.[0]?.url) throw new Error('No Instagram URL from backend');
   const allUrls = [...new Set(data.map(i => i.url).filter(Boolean))];
   const isVideo = data[0].url.match(/\.(mp4|webm|mkv|avi|mov)(\?|$)/i) || data[0]?.type === 'video' || url.includes('/reel/');
-  if (isVideo) return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: [data[0].url], type: 'video' };
-  return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: allUrls, type: 'image' };
+  if (isVideo) return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: [{ url: data[0].url, type: 'video' }], type: 'video' };
+  return { result: data[0].url, title: '', preview: data[0]?.thumbnail || '', media: allUrls.map(u => ({ url: u, type: 'image' })), type: 'image' };
 }
 
 async function ytScrapeFallback(url) {
@@ -332,9 +332,9 @@ async function instagramScrape(url) {
     || html.match(/"video_url":"([^"]+)"/)?.[1];
   if (vidUrl) return { result: vidUrl, title };
   const allImgs = [...new Set([...html.matchAll(/"display_url":"([^"]+)"/g)].map(m => m[1]))];
-  if (allImgs.length) return { result: allImgs[0], title, media: allImgs, type: 'image' };
+  if (allImgs.length) return { result: allImgs[0], title, media: allImgs.map(u => ({ url: u, type: 'image' })), type: 'image' };
   const ldMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
-  if (ldMatch) try { const ld = JSON.parse(ldMatch[1]); const u = ld.thumbnailUrl || ld.image; if (u) return { result: Array.isArray(u) ? u[0] : u, title, media: Array.isArray(u) ? u : [u], type: 'image' }; } catch (e) {}
+  if (ldMatch) try { const ld = JSON.parse(ldMatch[1]); const u = ld.thumbnailUrl || ld.image; const arr = Array.isArray(u) ? u : [u]; if (u) return { result: arr[0], title, media: arr.map(x => ({ url: x, type: 'image' })), type: 'image' }; } catch (e) {}
   const imgUrl = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1]
     || html.match(/<img[^>]*class="[^"]*photo[^"]*"[^>]*src="([^"]+)"/)?.[1];
   if (imgUrl) return { result: imgUrl, title, type: 'image' };
@@ -354,7 +354,7 @@ async function fvidgoFacebook(url) {
     return 'https://api.hitube.io/st-tik/token/' + jwt;
   });
   const isVideo = /\/videos\/|\/watch\/|\/reel\/|\/share\/v\//.test(url);
-  return { result: media[0], title, media, type: isVideo ? 'video' : 'image' };
+  return { result: media[0], title, media: media.map(u => ({ url: u, type: isVideo ? 'video' : 'image' })), type: isVideo ? 'video' : 'image' };
 }
 
 function addFvidgoAuth(fetchOpts) {
@@ -518,14 +518,14 @@ export async function onRequest(context) {
       if (!result) try { result = await fvidgoFacebook(url); } catch (e) {}
       const info = await pageInfo;
       if (!result && info.playUrl) result = { result: decodeHtmlEntities(info.playUrl), title: '' };
-      if (!result && info.ogImage) result = { result: decodeHtmlEntities(info.ogImage), title: decodeHtmlEntities(info.ogTitle || ''), type: 'image', media: [decodeHtmlEntities(info.ogImage)] };
+      if (!result && info.ogImage) result = { result: decodeHtmlEntities(info.ogImage), title: decodeHtmlEntities(info.ogTitle || ''), type: 'image', media: [{ url: decodeHtmlEntities(info.ogImage), type: 'image' }] };
       if (!result) {
         try {
           const mbasic = url.replace('://www.facebook.com', '://mbasic.facebook.com').replace('://facebook.com', '://mbasic.facebook.com').replace('://fb.watch', '://mbasic.facebook.com');
           const page = await fetch(mbasic, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
           const html = await page.text();
           const img = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1];
-          if (img) result = { result: decodeHtmlEntities(img), title: decodeHtmlEntities(html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1]?.trim() || ''), type: 'image', media: [decodeHtmlEntities(img)] };
+          if (img) result = { result: decodeHtmlEntities(img), title: decodeHtmlEntities(html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1]?.trim() || ''), type: 'image', media: [{ url: decodeHtmlEntities(img), type: 'image' }] };
         } catch (e2) {}
       }
       if (!result) return jsonResponse({ error: 'Facebook download failed' }, 500);
