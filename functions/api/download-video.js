@@ -512,8 +512,8 @@ export async function onRequest(context) {
         } catch { return {}; }
       })();
       let result;
-      try { result = await fvidgoFacebook(url); } catch (e) {}
-      if (!result) try { result = await snapsaveFetch(url); } catch (e) {}
+      try { result = await snapsaveFetch(url); } catch (e) {}
+      if (!result) try { result = await fvidgoFacebook(url); } catch (e) {}
       const info = await pageInfo;
       if (!result && info.playUrl) result = { result: decodeHtmlEntities(info.playUrl), title: '' };
       if (!result && info.ogImage) result = { result: decodeHtmlEntities(info.ogImage), title: decodeHtmlEntities(info.ogTitle || ''), type: 'image', media: [decodeHtmlEntities(info.ogImage)] };
