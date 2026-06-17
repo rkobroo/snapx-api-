@@ -518,14 +518,14 @@ export async function onRequest(context) {
       if (!result) try { result = await fvidgoFacebook(url); } catch (e) {}
       const info = await pageInfo;
       if (!result && info.playUrl) result = { result: decodeHtmlEntities(info.playUrl), title: '' };
-      if (!result && info.ogImage) result = { result: decodeHtmlEntities(info.ogImage), title: decodeHtmlEntities(info.ogTitle || ''), type: 'image', media: [{ url: decodeHtmlEntities(info.ogImage), type: 'image' }] };
+      if (!result && info.ogImage) result = { result: decodeHtmlEntities(info.ogImage), title: decodeHtmlEntities(info.ogTitle || ''), type: isFBVideo ? 'video' : 'image', media: [{ url: decodeHtmlEntities(info.ogImage), type: isFBVideo ? 'video' : 'image' }] };
       if (!result) {
         try {
           const mbasic = url.replace('://www.facebook.com', '://mbasic.facebook.com').replace('://facebook.com', '://mbasic.facebook.com').replace('://fb.watch', '://mbasic.facebook.com');
           const page = await fetch(mbasic, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
           const html = await page.text();
           const img = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1];
-          if (img) result = { result: decodeHtmlEntities(img), title: decodeHtmlEntities(html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1]?.trim() || ''), type: 'image', media: [{ url: decodeHtmlEntities(img), type: 'image' }] };
+          if (img) result = { result: decodeHtmlEntities(img), title: decodeHtmlEntities(html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1]?.trim() || ''), type: isFBVideo ? 'video' : 'image', media: [{ url: decodeHtmlEntities(img), type: isFBVideo ? 'video' : 'image' }] };
         } catch (e2) {}
       }
       if (!result) return jsonResponse({ error: 'Facebook download failed' }, 500);
