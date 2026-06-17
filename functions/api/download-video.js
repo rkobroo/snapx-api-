@@ -371,6 +371,34 @@ export async function onRequest(context) {
   const params = new URL(request.url).searchParams;
   const mode = params.get('mode');
 
+  // Metadata-only mode: scrape title + preview without resolving download URL (fast)
+  if (mode === 'metadata') {
+    const pageUrl = params.get('url');
+    if (!pageUrl) return jsonResponse({ error: 'Missing url' }, 400);
+    const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+    try {
+      const resp = await fetch(decodeURIComponent(pageUrl), {
+        headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
+        redirect: 'follow',
+      });
+      const html = await resp.text();
+      const decode = (s) => s ? s.replace(/&#x([\dA-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+        .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+        .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&apos;/g, "'").trim() : '';
+      const desc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i);
+      const ogTitle = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/i);
+      const ogDesc = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i);
+      const ogImage = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
+      const pageTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const title = decode(desc?.[1] || ogTitle?.[1] || ogDesc?.[1] || pageTitle?.[1] || '');
+      const image = ogImage?.[1] || '';
+      return jsonResponse({ title, preview: image });
+    } catch (e) {
+      return jsonResponse({ error: 'Failed to fetch metadata' }, 502);
+    }
+  }
+
   // Thumbnail proxy mode: fetch and return image with CORS headers
   if (mode === 'preview') {
     const imgUrl = params.get('url');
