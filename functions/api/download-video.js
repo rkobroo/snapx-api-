@@ -393,10 +393,10 @@ export async function onRequest(context) {
       const pageTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
       const title = decode(desc?.[1] || ogTitle?.[1] || ogDesc?.[1] || pageTitle?.[1] || '');
       const image = ogImage?.[1] || '';
-      const result = image || null;
-      const resp = { title, preview: image };
-      if (result) { resp.result = result; resp.type = 'image'; resp.media = [image]; }
-      return jsonResponse(resp);
+      const dlUrl = image || null;
+      const out = { title, preview: image };
+      if (dlUrl) { out.result = dlUrl; out.type = 'image'; out.media = [image]; }
+      return jsonResponse(out);
     } catch (e) {
       return jsonResponse({ error: 'Failed to fetch metadata' }, 502);
     }
