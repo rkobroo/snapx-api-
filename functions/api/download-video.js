@@ -160,7 +160,7 @@ async function snapsaveFetch(url, retries = 2) {
     if (!decoded) { if (attempt < retries) { await new Promise(r => setTimeout(r, 500)); continue; } throw new Error('Failed to decode snapsave response'); }
     const r = extractMedia(decoded);
     if (!r.url) { if (attempt < retries) { await new Promise(r => setTimeout(r, 500)); continue; } throw new Error('No media found'); }
-    return { result: r.url, title: r.description, preview: r.thumbnail };
+    return { result: r.url, title: r.description, preview: r.thumbnail, media: [r.url], type: 'video' };
   }
 }
 
