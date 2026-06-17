@@ -451,38 +451,38 @@ export async function onRequest(context) {
 
   try {
     if (url.includes('tiktok.com') || url.includes('tikwm.com')) {
-      let result;
-      try { result = await abTikTok(url); } catch (e) {}
-      if (!result) try { result = await snaptikFetch(url); } catch (e) {}
-      if (!result) try { result = await tikwmFetch(url); } catch (e) {}
-      if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
-      // Always try to get a fresh title from OEmbed
-      let freshTitle = '';
-      try {
-        const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        const o = await oembed.json();
-        const t = (o.title || o.description || '').replace(/ - TikTok$/, '').trim();
-        if (t) freshTitle = t;
-      } catch (e) {}
-      if (!freshTitle) {
+      // Fetch page title in parallel with backends
+      const titlePromise = (async () => {
+        try {
+          const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const o = await oembed.json();
+          const t = (o.title || o.description || '').replace(/ - TikTok$/, '').trim();
+          if (t && t !== 'TikTok - Make Your Day' && t !== 'TikTok') return t;
+        } catch (e) {}
         try {
           const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
           const html = await page.text();
           const ogDesc = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
-          if (ogDesc) freshTitle = decodeHtmlEntities(ogDesc[1].trim());
-          else {
-            const ogT = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
-            if (ogT) freshTitle = decodeHtmlEntities(ogT[1].trim());
-            else {
-              const mt = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
-              if (mt) freshTitle = decodeHtmlEntities(mt[1].replace(/ - TikTok$/, '').trim());
-            }
-          }
+          if (ogDesc) return decodeHtmlEntities(ogDesc[1].trim());
+          const ogT = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
+          if (ogT) return decodeHtmlEntities(ogT[1].trim());
+          const mt = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+          if (mt) return decodeHtmlEntities(mt[1].replace(/ - TikTok$/, '').trim());
         } catch (e2) {}
-      }
-      if (freshTitle && freshTitle !== 'TikTok - Make Your Day' && freshTitle !== 'TikTok') result.title = freshTitle;
+        return '';
+      })();
+      // Race backends: tikwmFetch is fastest, try it first alongside abTikTok
+      let result;
+      try {
+        result = await Promise.race([
+          tikwmFetch(url).then(r => ({ ...r, _src: 'tikwm' })),
+          abTikTok(url).then(r => ({ ...r, _src: 'ab' })),
+        ]);
+      } catch (e) {}
+      if (!result) try { result = await snaptikFetch(url); } catch (e) {}
+      if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
+      const freshTitle = await titlePromise;
+      if (freshTitle) result.title = freshTitle;
       return jsonResponse(result);
     }
 
@@ -493,45 +493,36 @@ export async function onRequest(context) {
     }
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
-      let result;
-      try { result = await fvidgoFacebook(url); } catch (e) {}
-      if (!result) try { result = await snapsaveFetch(url); } catch (e) {}
-      if (!result) {
+      const pageInfo = (async () => {
         try {
           const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
           const html = await page.text();
-          const urlMatch = html.match(/"playable_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/) || html.match(/"src":"([^"]+\.mp4)"/) || html.match(/video_url":"([^"]+)"/);
-          if (urlMatch) result = { result: decodeHtmlEntities(urlMatch[1]), title: '' };
-        } catch (e2) {}
-      }
+          const desc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
+          const ogt = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
+          const t = html.match(/<title>([\s\S]*?)<\/title>/);
+          const ogi = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/);
+          const playUrl = html.match(/"playable_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/) || html.match(/"src":"([^"]+\.mp4)"/) || html.match(/video_url":"([^"]+)"/);
+          return { desc: desc?.[1], ogTitle: ogt?.[1], pageTitle: t?.[1], ogImage: ogi?.[1], playUrl: playUrl?.[1] };
+        } catch { return {}; }
+      })();
+      let result;
+      try { result = await fvidgoFacebook(url); } catch (e) {}
+      if (!result) try { result = await snapsaveFetch(url); } catch (e) {}
+      const info = await pageInfo;
+      if (!result && info.playUrl) result = { result: decodeHtmlEntities(info.playUrl), title: '' };
+      if (!result && info.ogImage) result = { result: decodeHtmlEntities(info.ogImage), title: decodeHtmlEntities(info.ogTitle || ''), type: 'image', media: [decodeHtmlEntities(info.ogImage)] };
       if (!result) {
-        async function fbScrape(hostUrl) {
-          const page = await fetch(hostUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        try {
+          const mbasic = url.replace('://www.facebook.com', '://mbasic.facebook.com').replace('://facebook.com', '://mbasic.facebook.com').replace('://fb.watch', '://mbasic.facebook.com');
+          const page = await fetch(mbasic, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
           const html = await page.text();
           const img = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1];
-          if (!img) throw new Error('no image');
-          const title = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1] || '';
-          return { result: decodeHtmlEntities(img), title: decodeHtmlEntities(title.trim()), type: 'image', media: [decodeHtmlEntities(img)] };
-        }
-        try { result = await fbScrape(url); } catch (e) {
-          try { result = await fbScrape(url.replace('://www.facebook.com', '://mbasic.facebook.com').replace('://facebook.com', '://mbasic.facebook.com').replace('://fb.watch', '://mbasic.facebook.com')); } catch (e2) {}
-        }
+          if (img) result = { result: decodeHtmlEntities(img), title: decodeHtmlEntities(html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/)?.[1]?.trim() || ''), type: 'image', media: [decodeHtmlEntities(img)] };
+        } catch (e2) {}
       }
       if (!result) return jsonResponse({ error: 'Facebook download failed' }, 500);
-      try {
-        const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-        const html = await page.text();
-        const desc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
-        if (desc) result.title = decodeHtmlEntities(desc[1].trim());
-        else {
-          const ogt = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
-          if (ogt && !ogt[1].includes('Facebook')) result.title = decodeHtmlEntities(ogt[1].trim());
-          else {
-            const t = html.match(/<title>([\s\S]*?)<\/title>/);
-            if (t) result.title = decodeHtmlEntities(t[1].replace(/ \| Facebook$/, '').trim());
-          }
-        }
-      } catch (e3) {}
+      const title = decodeHtmlEntities((info.desc || info.ogTitle || info.pageTitle || '').replace(/ \| Facebook$/, '').trim());
+      if (title && !title.includes('Facebook')) result.title = title;
       return jsonResponse(result);
     }
 
