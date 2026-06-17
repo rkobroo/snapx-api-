@@ -390,18 +390,13 @@ export async function onRequest(context) {
       const ogTitle = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/i);
       const ogDesc = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i);
       const ogImage = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
-      const ogType = html.match(/<meta[^>]*property="og:type"[^>]*content="([^"]+)"/i);
       const pageTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
       const title = decode(desc?.[1] || ogTitle?.[1] || ogDesc?.[1] || pageTitle?.[1] || '');
       const image = ogImage?.[1] || '';
-      const isPhoto = ogType?.[1]?.startsWith('image') || (!ogType?.[1]?.includes('video') && !!image);
-      const result = isPhoto && image ? image : null;
-      return jsonResponse({
-        title,
-        preview: image,
-        result,
-        ...(result ? { type: 'image', media: [image] } : {})
-      });
+      const result = image || null;
+      const resp = { title, preview: image };
+      if (result) { resp.result = result; resp.type = 'image'; resp.media = [image]; }
+      return jsonResponse(resp);
     } catch (e) {
       return jsonResponse({ error: 'Failed to fetch metadata' }, 502);
     }
