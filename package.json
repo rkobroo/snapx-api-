@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "deploy": "npx wrangler pages deploy . --project-name rko-tv"
+    "deploy": "npx wrangler pages deploy . --project-name rko-api"
   },
   "dependencies": {
     "ab-downloader": "^1.0.2"
