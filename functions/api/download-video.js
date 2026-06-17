@@ -14,6 +14,15 @@ function decodeHtmlEntities(str) {
     .replace(/&apos;/g, "'");
 }
 
+function firstSuccess(promises) {
+  return new Promise((resolve, reject) => {
+    let rejected = 0;
+    for (const p of promises) {
+      p.then(resolve).catch(() => { rejected++; if (rejected === promises.length) reject(); });
+    }
+  });
+}
+
 const FVIDGO_PUB_KEY = 'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDCAdf/EyIbLBxjGqmh7qLU6/CPCzru+75+82OSPZ+nf4BFvg88drpZ6KigNW0J8TNgxe6Yms1irCZNVDyu+RXsl4y/7c2KOHc4OGTzHB5fUMiMasFUvcEs2P70e6yA/sKHZfBLG1XPhlb84Ibs3nhD3W5e2SuC+4EuVkaqzN08LQIDAQAB';
 
 function bytesToBigInt(bytes) {
@@ -474,10 +483,7 @@ export async function onRequest(context) {
       // Race backends: tikwmFetch is fastest, try it first alongside abTikTok
       let result;
       try {
-        result = await Promise.race([
-          tikwmFetch(url).then(r => ({ ...r, _src: 'tikwm' })),
-          abTikTok(url).then(r => ({ ...r, _src: 'ab' })),
-        ]);
+        result = await firstSuccess([tikwmFetch(url), abTikTok(url)]);
       } catch (e) {}
       if (!result) try { result = await snaptikFetch(url); } catch (e) {}
       if (!result) return jsonResponse({ error: 'TikTok download failed' }, 500);
