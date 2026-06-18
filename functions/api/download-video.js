@@ -604,7 +604,7 @@ export async function onRequest(context) {
         } catch { return {}; }
       })();
       const isFBVideo = /\/videos\/|\/watch\/|\/reel\/|\/share\/v\//.test(url);
-      if (isFBVideo) try { result = await snapsaveFetch(url); } catch (e) {}
+      if (!result && isFBVideo) try { result = await snapsaveFetch(url); } catch (e) {}
       if (!result) try { result = await fvidgoFacebook(url); } catch (e) {}
       const info = await pageInfo;
       if (!result && info.playUrl) result = { result: decodeHtmlEntities(info.playUrl), title: '' };
