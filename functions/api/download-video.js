@@ -28,14 +28,12 @@ async function snapxFetch(url) {
   if (jsonResp.status !== '100') throw new Error(jsonResp.message || 'snapx tiktok: request failed');
   const videoUrl = jsonResp.dl_full_hd || jsonResp.dl || jsonResp.snapxcdn || jsonResp.url;
   if (!videoUrl) throw new Error('No video URL from snapx tiktok');
-  if (url.includes('/photo/')) {
-    const tPart = videoUrl.match(/[?&]token=([^&]+)/);
-    if (tPart) {
-      const p = decodeJwtPayload(tPart[1]);
-      if (p && p.image_urls && p.image_urls.length) {
-        const images = p.image_urls.map(u => ({ url: u, type: 'image' }));
-        return { result: images[0].url, title: jsonResp.des || jsonResp.name || '', preview: images[0].url, media: images, type: 'image' };
-      }
+  const tPart = videoUrl.match(/[?&]token=([^&]+)/);
+  if (tPart) {
+    const p = decodeJwtPayload(tPart[1]);
+    if (p && p.image_urls && p.image_urls.length) {
+      const images = p.image_urls.map(u => ({ url: u, type: 'image' }));
+      return { result: images[0].url, title: jsonResp.des || jsonResp.name || '', preview: images[0].url, media: images, type: 'image' };
     }
   }
   return { result: videoUrl, title: jsonResp.des || jsonResp.name || '', preview: jsonResp.thumbnail || jsonResp.video_thumbnail || '', media: [{ url: videoUrl, type: 'video' }], type: 'video' };
