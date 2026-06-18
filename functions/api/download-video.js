@@ -10,6 +10,15 @@ async function createSnapxToken() {
   return data + '.' + sigB64;
 }
 
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payload));
+  } catch (e) { return null; }
+}
+
 async function snapxFetch(url) {
   const token = await createSnapxToken();
   const resp = await fetch(`https://api.snapx.info/v1/tiktok?url=${encodeURIComponent(url)}`, {
@@ -19,6 +28,16 @@ async function snapxFetch(url) {
   if (jsonResp.status !== '100') throw new Error(jsonResp.message || 'snapx tiktok: request failed');
   const videoUrl = jsonResp.dl_full_hd || jsonResp.dl || jsonResp.snapxcdn || jsonResp.url;
   if (!videoUrl) throw new Error('No video URL from snapx tiktok');
+  if (url.includes('/photo/')) {
+    const tPart = videoUrl.match(/[?&]token=([^&]+)/);
+    if (tPart) {
+      const p = decodeJwtPayload(tPart[1]);
+      if (p && p.image_urls && p.image_urls.length) {
+        const images = p.image_urls.map(u => ({ url: u, type: 'image' }));
+        return { result: images[0].url, title: jsonResp.des || jsonResp.name || '', preview: images[0].url, media: images, type: 'image' };
+      }
+    }
+  }
   return { result: videoUrl, title: jsonResp.des || jsonResp.name || '', preview: jsonResp.thumbnail || jsonResp.video_thumbnail || '', media: [{ url: videoUrl, type: 'video' }], type: 'video' };
 }
 
