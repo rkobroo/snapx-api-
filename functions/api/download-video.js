@@ -56,7 +56,16 @@ async function snapxInstagram(url) {
 }
 
 async function snapxFacebook(url) {
-  const token = await createSnapxToken();
+  const [token, pageResp] = await Promise.all([
+    createSnapxToken(),
+    fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null)
+  ]);
+  const pageTitle = pageResp?.ok ? await pageResp.text().then(html => {
+    let m = html.match(/<meta\s[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+    if (m) return m[1].replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c));
+    m = html.match(/<title>([^<]+)<\/title>/i);
+    return m ? m[1].trim() : null;
+  }).catch(() => null) : null;
   const resp = await fetch(`https://api.snapx.info/v1/fb?url=${encodeURIComponent(url)}`, {
     headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
   });
@@ -67,7 +76,9 @@ async function snapxFacebook(url) {
   const videoUrl = d.hd || d.sd || d.thumbnail;
   if (!videoUrl) throw new Error('No media URL from snapx facebook');
   const isVideo = !!(d.hd || d.sd);
-  return { result: videoUrl, title: d.title || d.des || '', preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
+  const snapxTitle = d.title || d.des || '';
+  const title = pageTitle && !/^Facebook\s+(Video|Post|Photo|Reel)\s*#/i.test(pageTitle) ? pageTitle : snapxTitle;
+  return { result: videoUrl, title, preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
 }
 
 async function snapxTwitter(url) {
