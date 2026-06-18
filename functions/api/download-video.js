@@ -101,6 +101,23 @@ async function snapxTwitter(url) {
   return { result: videoUrl, title: d.description || d.author_name || '', preview: d.cover_url || '', media: [{ url: videoUrl, type: 'video' }], type: 'video' };
 }
 
+function decodeHtmlEntities(str) {
+  return str.replace(/&#x([\da-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
+}
+
+async function fetchFacebookOgTitle(url) {
+  try {
+    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' } });
+    const html = await resp.text();
+    const m = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
+    if (!m) return '';
+    const t = decodeHtmlEntities(m[1]).trim();
+    return t && !t.startsWith('Facebook ') ? t : '';
+  } catch (e) { return ''; }
+}
+
 export async function onRequest(context) {
   const request = context.request;
   const cors = handleOptions(request);
@@ -160,6 +177,8 @@ export async function onRequest(context) {
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
       const result = await snapxFacebook(url);
+      const ogTitle = await fetchFacebookOgTitle(url);
+      if (ogTitle) result.title = ogTitle;
       return jsonResponse(result);
     }
 
