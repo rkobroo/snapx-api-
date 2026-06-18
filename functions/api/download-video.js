@@ -17,6 +17,14 @@ function decodeHtmlEntities(str) {
     .replace(/&apos;/g, "'");
 }
 
+function decodeJsString(str) {
+  str = str.replace(/\\u(d[89a-fA-F][\dA-Fa-f]{2})\\u(d[cdef][\dA-Fa-f]{2})/g, (_, hi, lo) => String.fromCodePoint((parseInt(hi, 16) - 0xD800) * 0x400 + (parseInt(lo, 16) - 0xDC00) + 0x10000));
+  str = str.replace(/\\u([\dA-Fa-f]{4})/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+  str = str.replace(/\\u\{([\dA-Fa-f]+)\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+  str = str.replace(/\\(["\\\/nrt])/g, (_, c) => ({'"':'"', '\\':'\\', '/':'/', 'n':'\n', 'r':'\r', 't':'\t'})[c]);
+  return str;
+}
+
 async function snapxFetch(url) {
   const token = await createSnapxToken();
   const resp = await fetch(`https://api.snapx.info/v1/tiktok?url=${encodeURIComponent(url)}`, {
@@ -90,7 +98,7 @@ async function snapxFacebook(url) {
   const isVideo = !!(d.hd || d.sd);
   const snapxTitle = decodeHtmlEntities(d.title || d.des || '');
   const pageTitle = pageInfo.desc || pageInfo.ogTitle || pageInfo.pageTitle || '';
-  const clean = decodeHtmlEntities(pageTitle).replace(/ \| Facebook$/, '').trim();
+  const clean = decodeJsString(decodeHtmlEntities(pageTitle)).replace(/ \| Facebook$/, '').trim();
   const title = clean && !/^Facebook\s/i.test(clean) ? clean : snapxTitle;
   return { result: videoUrl, title, preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
 }
