@@ -318,14 +318,14 @@ async function snapxInstagram(url) {
     headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
   });
   const jsonResp = await resp.json();
-  if (jsonResp.status_code !== -1) throw new Error(jsonResp.message || 'snapx instagram: request failed');
+  if (jsonResp.status_code !== 0) throw new Error(jsonResp.message || 'snapx instagram: request failed');
   const data = jsonResp.data;
   if (!data) throw new Error('snapx instagram: no data');
   const items = data.items || [];
   const allUrls = [];
   for (const item of items) {
-    const subItems = item.items || [];
-    if (subItems.length) {
+    const subItems = item.items;
+    if (subItems && subItems.length) {
       for (const si of subItems) { if (si.url) allUrls.push({ url: si.url, type: 'image' }); }
     } else if (item.video_url) {
       allUrls.push({ url: item.video_url, type: 'video' });
