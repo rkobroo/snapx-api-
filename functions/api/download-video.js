@@ -56,15 +56,15 @@ async function snapxInstagram(url) {
 }
 
 async function snapxFacebook(url) {
+  const mbasicUrl = url.replace(/^https?:\/\/(www\.)?facebook\.com/, 'https://mbasic.facebook.com');
   const [token, pageResp] = await Promise.all([
     createSnapxToken(),
-    fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5' } }).catch(() => null)
+    fetch(mbasicUrl, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36' } }).catch(() => null)
   ]);
   const pageTitle = pageResp?.ok ? await pageResp.text().then(html => {
-    let m = html.match(/<meta\s[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    if (m) return m[1].replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c));
-    m = html.match(/<title>([^<]+)<\/title>/i);
-    return m ? m[1].trim() : null;
+    let m = html.match(/<title>([^<]+)<\/title>/i);
+    if (m) return m[1].replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c)).trim();
+    return null;
   }).catch(() => null) : null;
   const resp = await fetch(`https://api.snapx.info/v1/fb?url=${encodeURIComponent(url)}`, {
     headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
