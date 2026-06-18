@@ -78,7 +78,7 @@ async function snapxFacebook(url) {
   const videoUrl = d.hd || d.sd || d.thumbnail;
   if (!videoUrl) throw new Error('No media URL from snapx facebook');
   const isVideo = !!(d.hd || d.sd);
-  return { result: videoUrl, title: d.title || d.des || '', preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
+  return { result: videoUrl, title: d.title || d.des || '', preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image', _snapxId: d.id };
 }
 
 async function snapxTwitter(url) {
@@ -107,13 +107,17 @@ function decodeHtmlEntities(str) {
     .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
 }
 
-async function fetchFacebookOgTitle(url) {
+async function fetchFacebookOgTitle(url, snapxId) {
   try {
-    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' } });
-    const html = await resp.text();
-    const m = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
-    if (!m) return '';
-    const t = decodeHtmlEntities(m[1]).trim();
+    const oembedUrl = snapxId
+      ? `https://graph.facebook.com/v19.0/oembed_video?url=${encodeURIComponent(`https://www.facebook.com/watch/?v=${snapxId}`)}&format=json`
+      : `https://graph.facebook.com/v19.0/oembed_video?url=${encodeURIComponent(url)}&format=json`;
+    const resp = await fetch(oembedUrl, { headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } });
+    const data = await resp.json();
+    if (!data.html) return '';
+    const pMatch = data.html.match(/<p>([^<]*)<\/p>/i);
+    if (!pMatch) return '';
+    const t = decodeHtmlEntities(pMatch[1]).trim();
     return t && !t.startsWith('Facebook ') ? t : '';
   } catch (e) { return ''; }
 }
@@ -177,7 +181,9 @@ export async function onRequest(context) {
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
       const result = await snapxFacebook(url);
-      const ogTitle = await fetchFacebookOgTitle(url);
+      const snapxId = result._snapxId;
+      delete result._snapxId;
+      const ogTitle = await fetchFacebookOgTitle(url, snapxId);
       if (ogTitle) result.title = ogTitle;
       return jsonResponse(result);
     }
