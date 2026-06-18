@@ -28,9 +28,9 @@ async function snapxInstagram(url) {
     headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
   });
   const jsonResp = await resp.json();
-  if (jsonResp.status_code !== -1) throw new Error(jsonResp.message || 'snapx instagram: request failed');
   const data = jsonResp.data;
   if (!data) throw new Error('snapx instagram: no data');
+  if (data.owner?.username === 'snapins.ai') throw new Error('Instagram backend unavailable — snapx API returned placeholder data');
   const media = [];
   const type = data.__type || '';
   if (type === 'GraphVideo') {
