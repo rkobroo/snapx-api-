@@ -321,6 +321,7 @@ async function snapxInstagram(url) {
   if (jsonResp.status_code !== 0) throw new Error(jsonResp.message || 'snapx instagram: request failed');
   const data = jsonResp.data;
   if (!data) throw new Error('snapx instagram: no data');
+  if (data.owner?.username === 'snapins.ai') throw new Error('snapx instagram: placeholder response');
   const items = data.items || [];
   const allUrls = [];
   for (const item of items) {
