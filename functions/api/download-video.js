@@ -58,7 +58,7 @@ async function snapxInstagram(url) {
 async function snapxFacebook(url) {
   const [token, pageResp] = await Promise.all([
     createSnapxToken(),
-    fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null)
+    fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5' } }).catch(() => null)
   ]);
   const pageTitle = pageResp?.ok ? await pageResp.text().then(html => {
     let m = html.match(/<meta\s[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
