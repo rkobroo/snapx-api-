@@ -39,6 +39,8 @@ async function snapxInstagram(url) {
       for (const si of subItems) { if (si.url) allUrls.push({ url: si.url, type: 'image' }); }
     } else if (item.video_url) {
       allUrls.push({ url: item.video_url, type: 'video' });
+    } else if (item.url) {
+      allUrls.push({ url: item.url, type: item.type === 'video' ? 'video' : 'image' });
     } else if (item.display_url) {
       allUrls.push({ url: item.display_url, type: 'image' });
     }
