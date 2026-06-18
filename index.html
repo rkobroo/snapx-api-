@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Downloader</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f0f1a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:rgba(255,255,255,.06);border-radius:16px;padding:32px;width:100%;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+h1{text-align:center;font-size:22px;margin-bottom:4px}
+.sub{text-align:center;color:#788;font-size:13px;margin-bottom:24px}
+.row{display:flex;gap:8px}
+.input-wrap{flex:1;position:relative}
+.input-wrap input{width:100%;padding:12px 32px 12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);color:#fff;font-size:14px;outline:0}
+.input-wrap input:focus{border-color:#4a9eff}
+.input-wrap .clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#788;font-size:18px;cursor:pointer;padding:2px 6px;display:none;line-height:1}
+.input-wrap .clear:hover{color:#fff}
+button{padding:12px 20px;border-radius:8px;border:0;background:#4a9eff;color:#fff;font-weight:600;cursor:pointer;font-size:14px;white-space:nowrap}
+button:disabled{opacity:.5;cursor:not-allowed}
+.loading{text-align:center;margin-top:20px;display:none}
+.loading.show{display:block}
+.spinner{display:inline-block;width:28px;height:28px;border:3px solid rgba(255,255,255,.15);border-top-color:#4a9eff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.video-wrap{margin-top:12px;display:none}
+.video-wrap.show{display:block}
+.video-wrap video,.video-wrap img{width:100%;border-radius:10px}
+.img-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.img-grid .item{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:8px;padding:4px;width:100%}
+.img-grid .item img{width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0}
+.img-grid .item button{padding:6px 10px;font-size:12px;white-space:nowrap}
+.meta{margin-top:8px;padding:12px;background:rgba(0,0,0,.25);border-radius:8px}
+.meta .title{font-size:14px;line-height:1.5;color:#ccc}
+.dl-wrap{margin-top:14px}
+.dl-wrap a{text-decoration:none}
+.dl-wrap button{width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);font-size:15px;padding:14px}
+.error{color:#f87171;font-size:13px;margin-top:12px;text-align:center;display:none}
+.error.show{display:block}
+.lightbox{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:999;justify-content:center;align-items:center;cursor:pointer}
+.lightbox.show{display:flex}
+.lightbox img{max-width:90vw;max-height:90vh;border-radius:8px;cursor:default;object-fit:contain}
+.lightbox-close{position:absolute;top:16px;right:20px;color:#fff;font-size:36px;cursor:pointer;z-index:1000;line-height:1}
+.lightbox-prev,.lightbox-next{position:absolute;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;padding:20px;z-index:1000;user-select:none;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.lightbox-prev{left:10px}
+.lightbox-next{right:10px}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Video Downloader</h1>
+<p class="sub">YouTube · TikTok · Facebook · Instagram · Twitter</p>
+<div class="row">
+<div class="input-wrap">
+<input type="url" id="url" placeholder="Paste video link here..." autofocus>
+<button class="clear" id="clearBtn" onclick="clearUrl()">&times;</button>
+</div>
+<button id="go" onclick="load()">Load</button>
+</div>
+<div class="loading" id="loading"><div class="spinner"></div></div>
+<div class="video-wrap" id="videoWrap"><video id="video" controls></video><div id="imgContainer" style="display:none"></div><div class="img-grid" id="imgGrid"></div></div>
+<div class="meta" id="meta"><div class="title" id="label"></div><button id="copyBtn" style="background:none;border:none;color:#4a9eff;cursor:pointer;font-size:12px;margin-top:6px;padding:0" onclick="copyTitle()">Copy</button></div>
+<div class="dl-wrap"><a id="dlLink" download><button>Download</button></a></div>
+<div class="error" id="errMsg"></div>
+</div>
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+  <span class="lightbox-prev" onclick="event.stopPropagation();navLightbox(-1)">&#10094;</span>
+  <img class="lightbox-img" id="lightboxImg" onclick="event.stopPropagation()">
+  <span class="lightbox-next" onclick="event.stopPropagation();navLightbox(1)">&#10095;</span>
+</div>
+<script>
+const $=(id)=>document.getElementById(id);
+const input=$('url'),go=$('go'),loading=$('loading');
+let lbImgs=[],lbIdx=0;
+const meta=$('meta'),label=$('label'),videoWrap=$('videoWrap'),video=$('video'),imgContainer=$('imgContainer'),imgGrid=$('imgGrid');
+const dlLink=$('dlLink'),errMsg=$('errMsg');
+
+async function load(){
+  const url=input.value.trim();
+  if(!url)return;
+  go.disabled=true;loading.classList.add('show');
+  videoWrap.classList.remove('show');video.src='';video.style.display='none';imgContainer.style.display='none';imgContainer.innerHTML='';imgGrid.innerHTML='';videoWrap.querySelector('iframe')?.remove();dlLink.style.display='';
+  errMsg.classList.remove('show');
+  try{
+    const r=await fetch('/api/download-video?url='+encodeURIComponent(url));
+    const d=await r.json();
+    if(d.error)throw new Error(d.error);
+    label.textContent=d.title||'';
+    const dlName=d.title||'media';
+    if(d.result){
+      const isImg=d.type==='image'||d.result.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
+      if(isImg){
+        const imgs=d.media&&d.media.length?d.media:[d.result];
+        lbImgs=imgs;imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const previewUrl=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;const img=document.createElement('img');img.src=previewUrl;img.onclick=()=>{lbIdx=i;document.getElementById('lightboxImg').src=previewUrl;document.getElementById('lightbox').classList.add('show')};img.style.cursor='pointer';const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
+        imgGrid.style.display='flex';videoWrap.classList.add('show')
+      }else if(d.type==='embed'){const f=document.createElement('iframe');f.src=d.result;f.style.cssText='width:100%;aspect-ratio:16/9;border:none;border-radius:10px';f.allow='autoplay; encrypted-media';f.allowFullscreen=true;videoWrap.appendChild(f);videoWrap.classList.add('show');dlLink.style.display='none'}
+      else{video.src=d.result;video.style.display='block';videoWrap.classList.add('show')}
+    }
+    dlLink.href='/api/download-video?mode=download&url='+encodeURIComponent(d.result)+'&name='+encodeURIComponent(dlName)+'&type='+(d.type==='image'?'image':'video');
+    dlLink.style.display='';
+  }catch(e){errMsg.textContent=e.message;errMsg.classList.add('show')}
+  finally{go.disabled=false;loading.classList.remove('show')}
+}
+input.addEventListener('keydown',e=>e.key==='Enter'&&load());
+input.addEventListener('input',()=>document.getElementById('clearBtn').style.display=input.value?'block':'none');
+function clearUrl(){input.value='';document.getElementById('clearBtn').style.display='none';input.focus()}
+function copyTitle(){navigator.clipboard.writeText(document.getElementById('label').textContent).then(()=>{const b=document.getElementById('copyBtn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000)})}
+
+function openLightbox(i){lbIdx=i;const u=lbImgs[i];document.getElementById('lightboxImg').src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;document.getElementById('lightbox').classList.add('show')}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('show')}
+function navLightbox(d){lbIdx=(lbIdx+d+lbImgs.length)%lbImgs.length;openLightbox(lbIdx)}
+document.addEventListener('keydown',e=>e.key==='Escape'&&closeLightbox())
+</script>
+</body>
+</html>
