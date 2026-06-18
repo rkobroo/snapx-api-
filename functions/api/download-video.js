@@ -590,7 +590,7 @@ export async function onRequest(context) {
 
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
       let result;
-      try { result = await snapxFacebook(url); if (result) return jsonResponse(result); } catch (e) {}
+      try { result = await snapxFacebook(url); } catch (e) {}
       const pageInfo = (async () => {
         try {
           const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
