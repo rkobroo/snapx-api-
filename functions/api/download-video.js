@@ -1,12 +1,5 @@
 import { jsonResponse, handleOptions } from './_utils.js';
 
-function decodeHtmlEntities(str) {
-  return str.replace(/&#x([\dA-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
-    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&apos;/g, "'");
-}
-
 async function createSnapxToken() {
   const secret = 'S7O1qf3ZRyNLYA';
   const b64url = (obj) => btoa(JSON.stringify(obj)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -142,29 +135,14 @@ export async function onRequest(context) {
   const url = decodeURIComponent(urlParam);
 
   try {
-    if (url.includes('tiktok.com') || url.includes('tikwm.com')) {
+    if (url.includes('tiktok.com')) {
       const result = await snapxFetch(url);
-      const titlePromise = (async () => {
-        try {
-          const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const o = await oembed.json();
-          const t = (o.title || o.description || '').replace(/ - TikTok$/, '').trim();
-          if (t && t !== 'TikTok - Make Your Day' && t !== 'TikTok') return t;
-        } catch (e) {}
-        try {
-          const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const html = await page.text();
-          const ogDesc = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
-          if (ogDesc) return decodeHtmlEntities(ogDesc[1].trim());
-          const ogT = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
-          if (ogT) return decodeHtmlEntities(ogT[1].trim());
-          const mt = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
-          if (mt) return decodeHtmlEntities(mt[1].replace(/ - TikTok$/, '').trim());
-        } catch (e2) {}
-        return '';
-      })();
-      const freshTitle = await titlePromise;
-      if (freshTitle) result.title = freshTitle;
+      try {
+        const oembed = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const o = await oembed.json();
+        const t = (o.title || o.description || '').replace(/ - TikTok$/, '').trim();
+        if (t && t !== 'TikTok - Make Your Day' && t !== 'TikTok') result.title = t;
+      } catch (e) {}
       return jsonResponse(result);
     }
 
