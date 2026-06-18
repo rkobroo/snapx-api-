@@ -66,7 +66,7 @@ async function snapxFacebook(url) {
   if (!d) throw new Error('snapx facebook: no data');
   const videoUrl = d.hd || d.sd || d.thumbnail;
   if (!videoUrl) throw new Error('No media URL from snapx facebook');
-  const isVideo = /\/videos\/|\/watch\/|\/reel\/|\/share\/v\//.test(url);
+  const isVideo = !!(d.hd || d.sd);
   return { result: videoUrl, title: d.title || d.des || '', preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
 }
 
