@@ -28,31 +28,42 @@ async function snapxInstagram(url) {
     headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
   });
   const jsonResp = await resp.json();
-  if (jsonResp.status_code !== 0) throw new Error(jsonResp.message || 'snapx instagram: request failed');
+  if (jsonResp.status_code !== -1) throw new Error(jsonResp.message || 'snapx instagram: request failed');
   const data = jsonResp.data;
   if (!data) throw new Error('snapx instagram: no data');
-  const items = data.items || [];
-  const allUrls = [];
-  for (const item of items) {
-    const subItems = item.items;
-    if (subItems && subItems.length) {
-      for (const si of subItems) { if (si.url) allUrls.push({ url: si.url, type: 'image' }); }
-    } else if (item.video_url) {
-      allUrls.push({ url: item.video_url, type: 'video' });
-    } else if (item.url) {
-      allUrls.push({ url: item.url, type: item.type === 'video' ? 'video' : 'image' });
-    } else if (item.display_url) {
-      allUrls.push({ url: item.display_url, type: 'image' });
+  const media = [];
+  const type = data.__type || '';
+  if (type === 'GraphVideo') {
+    const vu = data.video_url;
+    if (vu) media.push({ url: vu, type: 'video' });
+  } else if (type === 'GraphSidecar') {
+    const items = data.items || [];
+    for (const item of items) {
+      const it = item.__type || '';
+      if (it === 'GraphVideo') {
+        if (item.video_url) media.push({ url: item.video_url, type: 'video' });
+      } else if (it === 'GraphImage') {
+        const sis = item.items;
+        if (sis && sis.length) {
+          let best = sis[0];
+          for (const si of sis) { if ((si.width || 0) > (best.width || 0)) best = si; }
+          if (best.url) media.push({ url: best.url, type: 'image' });
+        } else if (item.url) {
+          media.push({ url: item.url, type: 'image' });
+        } else if (item.display_url) {
+          media.push({ url: item.display_url, type: 'image' });
+        }
+      }
     }
   }
-  if (!allUrls.length) {
-    if (data.video_url) allUrls.push({ url: data.video_url, type: 'video' });
-    else if (data.display_url) allUrls.push({ url: data.display_url, type: 'image' });
+  if (!media.length) {
+    if (data.video_url) media.push({ url: data.video_url, type: 'video' });
+    else if (data.display_url) media.push({ url: data.display_url, type: 'image' });
+    else if (data.url) media.push({ url: data.url, type: 'image' });
   }
-  if (!allUrls.length) throw new Error('No media URL from snapx instagram');
-  const firstUrl = allUrls[0].url;
-  const isVideo = allUrls.some(m => m.type === 'video');
-  return { result: firstUrl, title: data.title || data.shortcode || '', preview: data.display_url || '', media: allUrls, type: isVideo ? 'video' : 'image' };
+  if (!media.length) throw new Error('No media URL from snapx instagram');
+  const isVideo = media.some(m => m.type === 'video');
+  return { result: media[0].url, title: data.title || data.shortcode || '', preview: data.display_url || '', media, type: isVideo ? 'video' : 'image' };
 }
 
 async function snapxFacebook(url) {
