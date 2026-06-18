@@ -90,7 +90,7 @@ async function load(){
     if(d.result){
       const isImg=d.type==='image'||d.result.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
       if(isImg){
-        const imgs=d.media&&d.media.length?d.media:[d.result];
+        const imgs=d.media&&d.media.length?d.media.map(m=>typeof m==='string'?m:m.url):[d.result];
         lbImgs=imgs;imgs.forEach((u,i)=>{const item=document.createElement('div');item.className='item';const previewUrl=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;const img=document.createElement('img');img.src=previewUrl;img.onclick=()=>{lbIdx=i;document.getElementById('lightboxImg').src=previewUrl;document.getElementById('lightbox').classList.add('show')};img.style.cursor='pointer';const btn=document.createElement('button');btn.textContent='Download '+(i+1);btn.onclick=()=>{const a=document.createElement('a');a.href='/api/download-video?mode=download&url='+encodeURIComponent(u)+'&name='+encodeURIComponent((dlName||'photo')+'_'+(i+1))+'&type=image';a.download='';a.click()};item.appendChild(img);item.appendChild(btn);imgGrid.appendChild(item)});
         imgGrid.style.display='flex';videoWrap.classList.add('show')
       }else if(d.type==='embed'){const f=document.createElement('iframe');f.src=d.result;f.style.cssText='width:100%;aspect-ratio:16/9;border:none;border-radius:10px';f.allow='autoplay; encrypted-media';f.allowFullscreen=true;videoWrap.appendChild(f);videoWrap.classList.add('show');dlLink.style.display='none'}
@@ -106,7 +106,7 @@ input.addEventListener('input',()=>document.getElementById('clearBtn').style.dis
 function clearUrl(){input.value='';document.getElementById('clearBtn').style.display='none';input.focus()}
 function copyTitle(){navigator.clipboard.writeText(document.getElementById('label').textContent).then(()=>{const b=document.getElementById('copyBtn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000)})}
 
-function openLightbox(i){lbIdx=i;const u=lbImgs[i];document.getElementById('lightboxImg').src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;document.getElementById('lightbox').classList.add('show')}
+function openLightbox(i){lbIdx=i;const m=lbImgs[i],u=typeof m==='string'?m:m.url;document.getElementById('lightboxImg').src=u.includes('api.hitube.io')?'/api/download-video?mode=preview&url='+encodeURIComponent(u):u;document.getElementById('lightbox').classList.add('show')}
 function closeLightbox(){document.getElementById('lightbox').classList.remove('show')}
 function navLightbox(d){lbIdx=(lbIdx+d+lbImgs.length)%lbImgs.length;openLightbox(lbIdx)}
 document.addEventListener('keydown',e=>e.key==='Escape'&&closeLightbox())
