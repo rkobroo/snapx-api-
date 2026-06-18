@@ -1,11 +1,8 @@
-﻿{
+{
   "name": "rko-tv",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "deploy": "npx wrangler pages deploy . --project-name snapx-api"
-  },
-  "dependencies": {
-    "ab-downloader": "^1.0.2"
   }
 }
