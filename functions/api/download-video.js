@@ -621,7 +621,7 @@ export async function onRequest(context) {
       }
       if (!result) return jsonResponse({ error: 'Facebook download failed' }, 500);
       const title = decodeHtmlEntities((info.desc || info.ogTitle || info.pageTitle || '').replace(/ \| Facebook$/, '').trim());
-      if (title && !title.includes('Facebook')) result.title = title;
+      if (title && title !== 'Facebook' && title.length > 10) result.title = title;
       return jsonResponse(result);
     }
 
