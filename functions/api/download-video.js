@@ -10,6 +10,13 @@ async function createSnapxToken() {
   return data + '.' + sigB64;
 }
 
+function decodeHtmlEntities(str) {
+  return str.replace(/&#x([\dA-Fa-f]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&apos;/g, "'");
+}
+
 async function snapxFetch(url) {
   const token = await createSnapxToken();
   const resp = await fetch(`https://api.snapx.info/v1/tiktok?url=${encodeURIComponent(url)}`, {
@@ -56,16 +63,21 @@ async function snapxInstagram(url) {
 }
 
 async function snapxFacebook(url) {
-  const mbasicUrl = url.replace(/^https?:\/\/(www\.)?facebook\.com/, 'https://mbasic.facebook.com');
-  const [token, pageResp] = await Promise.all([
+  const [token, pageInfo] = await Promise.all([
     createSnapxToken(),
-    fetch(mbasicUrl, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36' } }).catch(() => null)
+    (async () => {
+      try {
+        const page = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        const html = await page.text();
+        const desc = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
+        const ogt = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
+        const t = html.match(/<title>([\s\S]*?)<\/title>/);
+        const ogi = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/);
+        const playUrl = html.match(/"playable_url":"([^"]+)"/) || html.match(/"playable_url_quality_hd":"([^"]+)"/) || html.match(/"src":"([^"]+\.mp4)"/) || html.match(/video_url":"([^"]+)"/);
+        return { desc: desc?.[1], ogTitle: ogt?.[1], pageTitle: t?.[1], ogImage: ogi?.[1], playUrl: playUrl?.[1] };
+      } catch { return {}; }
+    })()
   ]);
-  const pageTitle = pageResp?.ok ? await pageResp.text().then(html => {
-    let m = html.match(/<title>([^<]+)<\/title>/i);
-    if (m) return m[1].replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c)).trim();
-    return null;
-  }).catch(() => null) : null;
   const resp = await fetch(`https://api.snapx.info/v1/fb?url=${encodeURIComponent(url)}`, {
     headers: { 'X-App-Id': '22120300515132', 'X-App-Token': token, 'Content-Type': 'application/json; charset=utf-8' }
   });
@@ -76,8 +88,10 @@ async function snapxFacebook(url) {
   const videoUrl = d.hd || d.sd || d.thumbnail;
   if (!videoUrl) throw new Error('No media URL from snapx facebook');
   const isVideo = !!(d.hd || d.sd);
-  const snapxTitle = d.title || d.des || '';
-  const title = pageTitle && !/^Facebook\s+(Video|Post|Photo|Reel)\s*#/i.test(pageTitle) ? pageTitle : snapxTitle;
+  const snapxTitle = decodeHtmlEntities(d.title || d.des || '');
+  const pageTitle = pageInfo.desc || pageInfo.ogTitle || pageInfo.pageTitle || '';
+  const clean = decodeHtmlEntities(pageTitle).replace(/ \| Facebook$/, '').trim();
+  const title = clean && !/^Facebook\s/i.test(clean) ? clean : snapxTitle;
   return { result: videoUrl, title, preview: d.thumbnail || '', media: [{ url: videoUrl, type: isVideo ? 'video' : 'image' }], type: isVideo ? 'video' : 'image' };
 }
 
